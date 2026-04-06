@@ -7,6 +7,9 @@ on:
 permissions:
   contents: write
 
+env:
+  MOONBIT_VERSION: "0.1.20260309+f21b520"
+
 jobs:
   build:
     strategy:
@@ -25,12 +28,12 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: Install MoonBit (Unix)
         if: runner.os != 'Windows'
         run: |
-          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
+          curl -fsSL "https://cli.moonbitlang.com/install/unix.sh" | bash -s -- "$MOONBIT_VERSION"
           echo "$HOME/.moon/bin" >> $GITHUB_PATH
 
       - name: Install MoonBit (Windows)
@@ -38,6 +41,7 @@ jobs:
         shell: pwsh
         run: |
           Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
+          $env:MOONBIT_INSTALL_VERSION = "${{ env.MOONBIT_VERSION }}"
           irm https://cli.moonbitlang.com/install/powershell.ps1 | iex
           echo "$env:USERPROFILE\.moon\bin" | Out-File -Append -FilePath $env:GITHUB_PATH -Encoding utf8
 
@@ -58,7 +62,7 @@ jobs:
         run: Copy-Item "pkdx\_build\native\debug\build\src\main\main.exe" "${{ matrix.binary }}"
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: ${{ matrix.binary }}
           path: ${{ matrix.binary }}
@@ -67,10 +71,10 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           path: artifacts
 
