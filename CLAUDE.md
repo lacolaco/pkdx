@@ -18,6 +18,9 @@ CLIツール `pkdx` (MoonBit native binary) が pokedex.db への全クエリ、
 
 ## Setup
 
+各種ツールを実行する前に必ず setup.sh を実行すること。これによりDBの作成、マイグレーション適用、バイナリダウンロードが冪等実行される。
+setup.sh実行前ではすべてのツールが利用不可。
+
 ```bash
 ./setup.sh    # remote設定 + submodule初期化 + pokedex.db生成 + pkdxバイナリDL + box/ディレクトリ作成 を一括実行
 ```
