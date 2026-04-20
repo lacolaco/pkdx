@@ -135,8 +135,59 @@ fn build_cli() -> @admiral.CliApp {
       cmd_nash(),
       cmd_select(),
       cmd_meta_divergence(),
+      cmd_migrate(),
     ],
   )
+}
+
+///|
+/// `pkdx migrate` — apply pkdx_patch migrations to pokedex.db. Runs all
+/// unapplied migrations in declaration order inside per-step transactions.
+fn cmd_migrate() -> @admiral.CommandDef {
+  @admiral.command(
+    name="migrate",
+    description="Apply pkdx_patch migrations to pokedex.db (replaces apply.rb)",
+    options=[
+      @admiral.string(
+        "repo-root",
+        description="Repo root (defaults to CWD)",
+        default=Some(""),
+      ),
+      @admiral.bool(
+        "resync",
+        description="Clear bookkeeping and re-apply every migration; use after pulling data.json edits",
+      ),
+    ],
+    run=Some(fn(ctx) {
+      let repo_root = {
+        let r = ctx_str(ctx, "repo-root")
+        if r.length() > 0 { r } else { "." }
+      }
+      let resync = ctx.get_bool("resync")
+      run_migrate(repo_root, resync)
+    }),
+  )
+}
+
+///|
+fn run_migrate(repo_root : String, resync : Bool) -> Unit {
+  let db_path = match @sys.get_env_var("POKEDEX_DB") {
+    Some(p) => p
+    None => repo_root + "/pokedex/pokedex.db"
+  }
+  match @migrate.run(db_path, repo_root, resync~) {
+    Err(e) => exit_error(e)
+    Ok(report) =>
+      println(
+        "pkdx_patch: " +
+        report.applied.to_string() +
+        " applied, " +
+        report.skipped.to_string() +
+        " already applied (" +
+        report.total.to_string() +
+        " total)",
+      )
+  }
 }
 
 ///|
@@ -271,9 +322,11 @@ fn cmd_damage() -> @admiral.CommandDef {
       @admiral.string("tera-type", description="Tera type (ja)", default=Some("")),
       @admiral.bool("critical", description="Treat the hit as a critical"),
       @admiral.bool("double", description="Double battle (applies 0.75x to spread moves)"),
-      @admiral.int("atk-stat", description="Override attacker attack/special stat", default=Some(0)),
-      @admiral.int("def-stat", description="Override defender defense/special stat", default=Some(0)),
+      @admiral.int("atk-stat", description="Override attacker offensive stat (pre-rank). 用途: ボディプレス/イカサマ/カスタム実数値再現", default=Some(0)),
+      @admiral.int("def-stat", description="Override defender defensive stat (pre-rank). 用途: カスタム実数値再現", default=Some(0)),
       @admiral.int("def-hp", description="Override defender HP", default=Some(0)),
+      @admiral.string("atk-nature", description="Attacker nature (ja), e.g. ようき. Default: 攻撃stat特化相当 (+10%)", default=Some("")),
+      @admiral.string("def-nature", description="Defender nature (ja), e.g. ずぶとい. Default: 無補正", default=Some("")),
       @admiral.int("atk-rank", description="Attacker stat stage (-6..+6). For Body Press this is the Defense stage", default=Some(0)),
       @admiral.int("def-rank", description="Defender stat stage (-6..+6)", default=Some(0)),
       @admiral.int("fainted-count", description="Number of fainted allies (0-5, for Supreme Overlord/そうだいしょう)", default=Some(2)),
@@ -307,6 +360,8 @@ fn cmd_damage() -> @admiral.CommandDef {
         ctx_int(ctx, "atk-stat"),
         ctx_int(ctx, "def-stat"),
         ctx_int(ctx, "def-hp"),
+        ctx_str(ctx, "atk-nature"),
+        ctx_str(ctx, "def-nature"),
         ctx_int(ctx, "atk-rank"),
         ctx_int(ctx, "def-rank"),
         ctx_int(ctx, "fainted-count"),
@@ -671,6 +726,8 @@ fn run_damage(
   atk_stat : Int,
   def_stat : Int,
   def_hp : Int,
+  atk_nature_str : String,
+  def_nature_str : String,
   atk_rank : Int,
   def_rank : Int,
   fainted_count : Int,
@@ -682,6 +739,28 @@ fn run_damage(
   if def_rank < -6 || def_rank > 6 {
     println("Error: --def-rank must be in [-6, 6]")
     return
+  }
+  let atk_nature : @model.Nature? = if atk_nature_str.length() == 0 {
+    None
+  } else {
+    match @model.nature_from_ja(atk_nature_str) {
+      Some(n) => Some(n)
+      None => {
+        println("Error: Unknown nature: " + atk_nature_str)
+        return
+      }
+    }
+  }
+  let def_nature : @model.Nature? = if def_nature_str.length() == 0 {
+    None
+  } else {
+    match @model.nature_from_ja(def_nature_str) {
+      Some(n) => Some(n)
+      None => {
+        println("Error: Unknown nature: " + def_nature_str)
+        return
+      }
+    }
   }
   with_db(fn(db) {
     let atk_pokemon = match @db.query_pokemon(db, attacker_name, game.version) {
@@ -717,6 +796,8 @@ fn run_damage(
       field,
       tera_type,
       critical,
+      atk_nature,
+      def_nature,
       atk_stat_override: atk_stat,
       def_stat_override: def_stat,
       def_hp_override: def_hp,

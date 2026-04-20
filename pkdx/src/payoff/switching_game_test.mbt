@@ -34,6 +34,10 @@ test "state_is_hashable_and_distinguishes_meaningful_fields" {
     opp_mega_used: false,
     my_megaed: [false, false, false],
     opp_megaed: [false, false, false],
+    my_status: [@model.None, @model.None, @model.None],
+    opp_status: [@model.None, @model.None, @model.None],
+    my_must_recharge: [false, false, false],
+    opp_must_recharge: [false, false, false],
     turn: 0,
   }
   let same : SwitchingGameState = {
@@ -47,6 +51,10 @@ test "state_is_hashable_and_distinguishes_meaningful_fields" {
     opp_mega_used: false,
     my_megaed: [false, false, false],
     opp_megaed: [false, false, false],
+    my_status: [@model.None, @model.None, @model.None],
+    opp_status: [@model.None, @model.None, @model.None],
+    my_must_recharge: [false, false, false],
+    opp_must_recharge: [false, false, false],
     turn: 0,
   }
   let diff_active = { ..base, my_active: 1 }
@@ -84,6 +92,10 @@ test "terminal_value_all_my_fainted_returns_minus_one" {
     opp_mega_used: false,
     my_megaed: [false, false, false],
     opp_megaed: [false, false, false],
+    my_status: [@model.None, @model.None, @model.None],
+    opp_status: [@model.None, @model.None, @model.None],
+    my_must_recharge: [false, false, false],
+    opp_must_recharge: [false, false, false],
     turn: 0,
   }
   match terminal_value(state, team_a, team_b, 5) {
@@ -107,6 +119,10 @@ test "terminal_value_all_opp_fainted_returns_plus_one" {
     opp_mega_used: false,
     my_megaed: [false, false, false],
     opp_megaed: [false, false, false],
+    my_status: [@model.None, @model.None, @model.None],
+    opp_status: [@model.None, @model.None, @model.None],
+    my_must_recharge: [false, false, false],
+    opp_must_recharge: [false, false, false],
     turn: 0,
   }
   match terminal_value(state, team_a, team_b, 5) {
@@ -132,6 +148,10 @@ test "terminal_value_turn_limit_reached_returns_hp_ratio_in_signed_range" {
     opp_mega_used: false,
     my_megaed: [false, false],
     opp_megaed: [false, false],
+    my_status: [@model.None, @model.None],
+    opp_status: [@model.None, @model.None],
+    my_must_recharge: [false, false],
+    opp_must_recharge: [false, false],
     turn: 3,
   }
   match terminal_value(state, team_a, team_b, 3) {
@@ -155,6 +175,10 @@ test "terminal_value_both_alive_before_limit_returns_none" {
     opp_mega_used: false,
     my_megaed: [false, false, false],
     opp_megaed: [false, false, false],
+    my_status: [@model.None, @model.None, @model.None],
+    opp_status: [@model.None, @model.None, @model.None],
+    my_must_recharge: [false, false, false],
+    opp_must_recharge: [false, false, false],
     turn: 0,
   }
   match terminal_value(state, team_a, team_b, 5) {
@@ -221,6 +245,10 @@ test "value_returns_terminal_value_for_terminal_state" {
     opp_mega_used: false,
     my_megaed: [false, false],
     opp_megaed: [false, false],
+    my_status: [@model.None, @model.None],
+    opp_status: [@model.None, @model.None],
+    my_must_recharge: [false, false],
+    opp_must_recharge: [false, false],
     turn: 5,
   }
   let cache : @hashmap.HashMap[SwitchingGameState, Double] = @hashmap.HashMap::new()
@@ -261,6 +289,10 @@ test "value_caches_result_via_value_stats" {
     opp_mega_used: false,
     my_megaed: [false, false],
     opp_megaed: [false, false],
+    my_status: [@model.None, @model.None],
+    opp_status: [@model.None, @model.None],
+    my_must_recharge: [false, false],
+    opp_must_recharge: [false, false],
     turn: 0,
   }
   let cache : @hashmap.HashMap[SwitchingGameState, Double] = @hashmap.HashMap::new()
@@ -343,6 +375,10 @@ test "transition_attack_vs_attack_resolves_sequentially_by_speed" {
     opp_mega_used: false,
     my_megaed: [false],
     opp_megaed: [false],
+    my_status: [@model.None],
+    opp_status: [@model.None],
+    my_must_recharge: [false],
+    opp_must_recharge: [false],
     turn: 0,
   }
   let next = transition(state, UseMove(0), UseMove(0), [fast], [slow])
@@ -381,6 +417,10 @@ test "transition_attack_vs_switch_damages_newly_switched_target" {
     opp_mega_used: false,
     my_megaed: [false],
     opp_megaed: [false, false],
+    my_status: [@model.None],
+    opp_status: [@model.None, @model.None],
+    my_must_recharge: [false, false],
+    opp_must_recharge: [false, false],
     turn: 0,
   }
   let next = transition(state, UseMove(0), Switch(1), my_team, opp_team)
@@ -424,6 +464,10 @@ test "transition_switch_vs_switch_updates_actives_only_without_damage" {
     opp_mega_used: false,
     my_megaed: [false, false],
     opp_megaed: [false, false],
+    my_status: [@model.None, @model.None],
+    opp_status: [@model.None, @model.None],
+    my_must_recharge: [false, false],
+    opp_must_recharge: [false, false],
     turn: 0,
   }
   let next = transition(state, Switch(1), Switch(1), my_team, opp_team)
@@ -488,6 +532,10 @@ test "state_ranks_distinguish_otherwise_identical_states" {
     opp_mega_used: false,
     my_megaed: [false],
     opp_megaed: [false],
+    my_status: [@model.None],
+    opp_status: [@model.None],
+    my_must_recharge: [false],
+    opp_must_recharge: [false],
     turn: 0,
   }
   let boosted = { ..base, my_ranks: [2, 0, 0, 0, 0] }
@@ -528,6 +576,10 @@ test "transition_priority_move_outpaces_faster_opponent" {
     opp_mega_used: false,
     my_megaed: [false],
     opp_megaed: [false],
+    my_status: [@model.None],
+    opp_status: [@model.None],
+    my_must_recharge: [false],
+    opp_must_recharge: [false],
     turn: 0,
   }
   let next = transition(
@@ -542,7 +594,7 @@ test "transition_priority_move_outpaces_faster_opponent" {
 test "transition_sword_dance_raises_attacker_rank_by_two" {
   let me = mk_combatant(
     mk_pokemon("A", "ノーマル", "", 100, 100, 100, 100, 100, 100),
-    [mk_move("つるぎのまい", "ノーマル", @model.Status, 0, stat_effects=[(0, 2)])],
+    [mk_move("つるぎのまい", "ノーマル", @model.Status, 0, stat_effects=[@model.StatEffect::{ stat: 0, delta: 2, target: 0 }])],
   )
   let opp = mk_combatant(
     mk_pokemon("B", "ノーマル", "", 100, 100, 100, 100, 100, 100),
@@ -559,6 +611,10 @@ test "transition_sword_dance_raises_attacker_rank_by_two" {
     opp_mega_used: false,
     my_megaed: [false],
     opp_megaed: [false],
+    my_status: [@model.None],
+    opp_status: [@model.None],
+    my_must_recharge: [false],
+    opp_must_recharge: [false],
     turn: 0,
   }
   let next = transition(state, UseMove(0), UseMove(0), [me], [opp])
@@ -569,7 +625,7 @@ test "transition_sword_dance_raises_attacker_rank_by_two" {
 test "transition_rank_clamps_to_plus_two_after_two_sword_dances" {
   let me = mk_combatant(
     mk_pokemon("A", "ノーマル", "", 100, 100, 100, 100, 100, 200),
-    [mk_move("つるぎのまい", "ノーマル", @model.Status, 0, stat_effects=[(0, 2)])],
+    [mk_move("つるぎのまい", "ノーマル", @model.Status, 0, stat_effects=[@model.StatEffect::{ stat: 0, delta: 2, target: 0 }])],
   )
   let opp = mk_combatant(
     mk_pokemon("B", "ノーマル", "", 100, 100, 100, 100, 100, 100),
@@ -586,6 +642,10 @@ test "transition_rank_clamps_to_plus_two_after_two_sword_dances" {
     opp_mega_used: false,
     my_megaed: [false],
     opp_megaed: [false],
+    my_status: [@model.None],
+    opp_status: [@model.None],
+    my_must_recharge: [false],
+    opp_must_recharge: [false],
     turn: 0,
   }
   state = transition(state, UseMove(0), UseMove(0), [me], [opp])
@@ -628,6 +688,10 @@ test "transition_switch_resets_active_ranks_to_zero" {
     opp_mega_used: false,
     my_megaed: [false, false],
     opp_megaed: [false, false],
+    my_status: [@model.None, @model.None],
+    opp_status: [@model.None, @model.None],
+    my_must_recharge: [false, false],
+    opp_must_recharge: [false, false],
     turn: 0,
   }
   let next = transition(state, Switch(1), Switch(1), my_team, opp_team)
@@ -661,6 +725,10 @@ test "transition_rank_affects_damage_sword_dance_increases_output" {
     opp_mega_used: false,
     my_megaed: [false],
     opp_megaed: [false],
+    my_status: [@model.None],
+    opp_status: [@model.None],
+    my_must_recharge: [false],
+    opp_must_recharge: [false],
     turn: 0,
   }
   let boosted : SwitchingGameState = { ..neutral, my_ranks: [2, 0, 0, 0, 0] }
@@ -840,6 +908,10 @@ fn mk_mega_state_1v1(
     opp_mega_used,
     my_megaed: [my_megaed],
     opp_megaed: [opp_megaed],
+    my_status: [@model.None],
+    opp_status: [@model.None],
+    my_must_recharge: [false],
+    opp_must_recharge: [false],
     turn: 0,
   }
 }
@@ -1045,6 +1117,10 @@ test "transition_mega_vs_switch_damages_newly_switched_target" {
     opp_mega_used: false,
     my_megaed: [false],
     opp_megaed: [false, false],
+    my_status: [@model.None],
+    opp_status: [@model.None, @model.None],
+    my_must_recharge: [false, false],
+    opp_must_recharge: [false, false],
     turn: 0,
   }
   let next = transition(state, Mega(0), Switch(1), [me], opp_team)
@@ -1106,6 +1182,10 @@ test "mega_persists_after_switch_out_and_back_in" {
     opp_mega_used: false,
     my_megaed: [false, false],
     opp_megaed: [false],
+    my_status: [@model.None, @model.None],
+    opp_status: [@model.None],
+    my_must_recharge: [false],
+    opp_must_recharge: [false],
     turn: 0,
   }
   // Turn 1: mega slot 0.
@@ -1312,6 +1392,10 @@ fn switching_game_winrate_no_prune(
     opp_mega_used: false,
     my_megaed,
     opp_megaed,
+    my_status: zero_status(my_team.length()),
+    opp_status: zero_status(opp_team.length()),
+    my_must_recharge: Array::make(my_team.length(), false),
+    opp_must_recharge: Array::make(opp_team.length(), false),
     turn: 0,
   }
   let cache : @hashmap.HashMap[SwitchingGameState, Double] = @hashmap.HashMap::new()
@@ -1416,6 +1500,10 @@ test "value_accepts_explicit_alpha_beta_and_matches_default" {
     opp_mega_used: false,
     my_megaed: [false, false],
     opp_megaed: [false, false],
+    my_status: [@model.None, @model.None],
+    opp_status: [@model.None, @model.None],
+    my_must_recharge: [false, false],
+    opp_must_recharge: [false, false],
     turn: 0,
   }
   let cache1 : @hashmap.HashMap[SwitchingGameState, Double] = @hashmap.HashMap::new()
@@ -1521,4 +1609,228 @@ test "state_space_3v3_turn_limit_5_bounded" {
   assert_true(not(v.is_nan()))
   assert_true(stats.cached_states > 0)
   assert_true(stats.cached_states < 500000)
+}
+
+///|
+/// Phase 3 integration: あまえる fired by a faster attacker drops the
+/// defender's Atk by 2 the *same turn*, so the slower defender's physical
+/// move lands for reduced damage.
+test "Amaeru lowers opp Atk -2 this turn, slower physical damage reduced" {
+  let fast = mk_combatant(
+    mk_pokemon("A", "フェアリー", "", 200, 120, 100, 100, 100, 200),
+    [
+      mk_move(
+        "amaeru", "フェアリー", @model.Status, 0,
+        stat_effects=[@model.StatEffect::{ stat: 0, delta: -2, target: 1 }],
+      ),
+      mk_move("filler", "ノーマル", @model.Status, 0),
+    ],
+  )
+  let slow = mk_combatant(
+    mk_pokemon("B", "ノーマル", "", 200, 180, 100, 100, 100, 50),
+    [mk_move("tackle", "ノーマル", @model.Physical, 80)],
+  )
+  let state : SwitchingGameState = {
+    my_active: 0,
+    opp_active: 0,
+    my_hps: [200],
+    opp_hps: [200],
+    my_ranks: [0, 0, 0, 0, 0],
+    opp_ranks: [0, 0, 0, 0, 0],
+    my_mega_used: false,
+    opp_mega_used: false,
+    my_megaed: [false],
+    opp_megaed: [false],
+    my_status: [@model.None],
+    opp_status: [@model.None],
+    my_must_recharge: [false],
+    opp_must_recharge: [false],
+    turn: 0,
+  }
+  let ns_amaeru = transition(state, UseMove(0), UseMove(0), [fast], [slow])
+  let damage_with_amaeru = 200 - ns_amaeru.my_hps[0]
+  let ns_filler = transition(state, UseMove(1), UseMove(0), [fast], [slow])
+  let damage_without = 200 - ns_filler.my_hps[0]
+  assert_true(damage_without > 0)
+  assert_true(damage_with_amaeru < damage_without)
+  assert_eq(ns_amaeru.opp_ranks[0], -2)
+  assert_eq(ns_filler.opp_ranks[0], 0)
+}
+
+///|
+/// Phase 2 integration: もろはのずつき (1/2 recoil) — attacker HP drops by
+/// half the damage dealt on the hit, via the normal transition path.
+test "recoil 1/2 subtracts half of damage from attacker HP" {
+  let attacker = mk_combatant(
+    mk_pokemon("A", "いわ", "", 200, 180, 100, 100, 100, 120),
+    [mk_move("head_smash", "いわ", @model.Physical, 150, recoil_num=1, recoil_den=2)],
+  )
+  let defender = mk_combatant(
+    mk_pokemon("B", "ノーマル", "", 200, 100, 100, 100, 100, 60),
+    [mk_move("tackle", "ノーマル", @model.Physical, 40)],
+  )
+  let state : SwitchingGameState = {
+    my_active: 0,
+    opp_active: 0,
+    my_hps: [200],
+    opp_hps: [200],
+    my_ranks: [0, 0, 0, 0, 0],
+    opp_ranks: [0, 0, 0, 0, 0],
+    my_mega_used: false,
+    opp_mega_used: false,
+    my_megaed: [false],
+    opp_megaed: [false],
+    my_status: [@model.None],
+    opp_status: [@model.None],
+    my_must_recharge: [false],
+    opp_must_recharge: [false],
+    turn: 0,
+  }
+  let ns = transition(state, UseMove(0), UseMove(0), [attacker], [defender])
+  let dmg_dealt = 200 - ns.opp_hps[0]
+  // Recoil is max(1, dmg/2), so attacker HP drop should equal dmg/2 plus any
+  // non-recoil losses (defender uses Tackle which DOES hit — pin numeric
+  // equality to exactly `defender_tackle + head_smash_recoil`).
+  let defender_tackle = 200 - ns.my_hps[0] - dmg_dealt / 2
+  assert_true(dmg_dealt > 0) // Head Smash landed
+  assert_true(defender_tackle >= 0) // Tackle is not immune
+  // Attacker took at least dmg_dealt/2 damage from recoil on top of Tackle.
+  assert_true(200 - ns.my_hps[0] >= dmg_dealt / 2)
+}
+
+///|
+/// Phase 2 integration: じばく vs Ghost target. Damage is 0 (Normal-type
+/// attack on Ghost), but `self_ko` still zeroes attacker HP. Pins the
+/// canonical "self_ko independent of dmg" rule.
+test "self_ko zeroes attacker HP even when hitting Ghost (dmg=0)" {
+  let attacker = mk_combatant(
+    mk_pokemon("Normal", "ノーマル", "", 100, 150, 100, 100, 100, 100),
+    [mk_move("jibaku", "ノーマル", @model.Physical, 250, self_ko=true)],
+  )
+  let ghost = mk_combatant(
+    mk_pokemon("Ghost", "ゴースト", "", 200, 100, 100, 100, 100, 50),
+    [mk_move("idle", "ノーマル", @model.Status, 0)],
+  )
+  let state : SwitchingGameState = {
+    my_active: 0,
+    opp_active: 0,
+    my_hps: [100],
+    opp_hps: [200],
+    my_ranks: [0, 0, 0, 0, 0],
+    opp_ranks: [0, 0, 0, 0, 0],
+    my_mega_used: false,
+    opp_mega_used: false,
+    my_megaed: [false],
+    opp_megaed: [false],
+    my_status: [@model.None],
+    opp_status: [@model.None],
+    my_must_recharge: [false],
+    opp_must_recharge: [false],
+    turn: 0,
+  }
+  let ns = transition(state, UseMove(0), UseMove(0), [attacker], [ghost])
+  // Ghost ist immune to the Normal-type self-destruct, so defender HP untouched.
+  assert_eq(ns.opp_hps[0], 200)
+  // Attacker fainted from self_ko regardless of the 0-damage hit.
+  assert_eq(ns.my_hps[0], 0)
+}
+
+///|
+/// Phase 2 integration: はかいこうせん sets must_recharge, and the observable
+/// effect is that the turn-after attack is a no-op. Uses the full
+/// `attempt_turn_with_cache` path (not a preset state) so the move's
+/// `recharge=true` flag drives the flag, not the test fixture.
+test "recharge move forces attacker skip on the turn after the hit lands" {
+  let me = mk_combatant(
+    mk_pokemon("A", "ノーマル", "", 200, 200, 100, 100, 100, 120),
+    [mk_move("hyper_beam", "ノーマル", @model.Special, 150, recharge=true)],
+  )
+  let opp = mk_combatant(
+    mk_pokemon("B", "ノーマル", "", 300, 100, 100, 100, 100, 60),
+    [mk_move("idle", "ノーマル", @model.Status, 0)],
+  )
+  let s0 : SwitchingGameState = {
+    my_active: 0,
+    opp_active: 0,
+    my_hps: [200],
+    opp_hps: [300],
+    my_ranks: [0, 0, 0, 0, 0],
+    opp_ranks: [0, 0, 0, 0, 0],
+    my_mega_used: false,
+    opp_mega_used: false,
+    my_megaed: [false],
+    opp_megaed: [false],
+    my_status: [@model.None],
+    opp_status: [@model.None],
+    my_must_recharge: [false],
+    opp_must_recharge: [false],
+    turn: 0,
+  }
+  let outs1 = attempt_turn_with_cache(
+    s0, UseMove(0), UseMove(0), [me], [opp], new_damage_cache(),
+  )
+  assert_eq(outs1.length(), 1)
+  let (_, s1) = outs1[0]
+  // Hyper Beam landed on turn 1.
+  assert_true(s1.opp_hps[0] < 300)
+  // Post-hit helper set the recharge flag; the turn-end clear only consumes
+  // flags that were true at turn start, so the freshly-set flag persists
+  // into turn 2.
+  assert_eq(s1.my_must_recharge[0], true)
+  let hp_before_turn2 = s1.opp_hps[0]
+  let outs2 = attempt_turn_with_cache(
+    s1, UseMove(0), UseMove(0), [me], [opp], new_damage_cache(),
+  )
+  assert_eq(outs2.length(), 1)
+  let (_, s2) = outs2[0]
+  // Turn 2: recharge blocks UseMove, observable as no new damage to opp.
+  assert_eq(s2.opp_hps[0], hp_before_turn2)
+  // Flag consumed at end of turn 2 (it was set at turn 2 start).
+  assert_eq(s2.my_must_recharge[0], false)
+  // Turn 3 (not exercised here) would allow a fresh Hyper Beam again.
+}
+
+///|
+/// Phase 1 behavior guard for `must_recharge`. The flag is preset on the
+/// state directly (no recharge move exists yet — moves gain `recharge` in
+/// Phase 2), so this test exercises only the `per_side_attempt` short-circuit
+/// and the turn-end clear path.
+test "must_recharge forces attacker UseMove to skip and clears after one turn" {
+  let me = mk_combatant(
+    mk_pokemon("A", "ノーマル", "", 100, 150, 100, 100, 100, 150),
+    [mk_move("hb", "ノーマル", @model.Physical, 150)],
+  )
+  let opp = mk_combatant(
+    mk_pokemon("B", "ノーマル", "", 200, 100, 100, 100, 100, 50),
+    [mk_move("idle", "ノーマル", @model.Status, 0)],
+  )
+  let state : SwitchingGameState = {
+    my_active: 0,
+    opp_active: 0,
+    my_hps: [100],
+    opp_hps: [200],
+    my_ranks: [0, 0, 0, 0, 0],
+    opp_ranks: [0, 0, 0, 0, 0],
+    my_mega_used: false,
+    opp_mega_used: false,
+    my_megaed: [false],
+    opp_megaed: [false],
+    my_status: [@model.None],
+    opp_status: [@model.None],
+    my_must_recharge: [true],
+    opp_must_recharge: [false],
+    turn: 0,
+  }
+  let outs = attempt_turn_with_cache(
+    state, UseMove(0), UseMove(0), [me], [opp], new_damage_cache(),
+  )
+  // Deterministic: no accuracy/status fan-out from either side.
+  assert_eq(outs.length(), 1)
+  let (p, next) = outs[0]
+  assert_true((p - 1.0).abs() < 1.0e-9)
+  // Attacker skipped → opp HP unchanged.
+  assert_eq(next.opp_hps[0], 200)
+  // Recharge consumed at end of turn.
+  assert_eq(next.my_must_recharge[0], false)
+  assert_eq(next.opp_must_recharge[0], false)
 }

@@ -12,6 +12,29 @@ pub const DP_TURN_LIMIT : Int = 5
 pub const MC_TURN_LIMIT : Int = 5
 
 ///|
+/// `pkdx select` の auto-screening 閾値。`SwitchingGame(N)` のまま DP が
+/// 走ると 20×20 のマトリクス全セルで 4 ターン以上の先読みが必要になり、
+/// 状態異常実装以降は確率ファンアウト (まひ 12.5% / 命中率 / 状態付与 chance)
+/// により DP 分岐数が倍増するため、この turn_limit 以上で自動的に
+/// `ScreenedSwitchingGame` にフォールバックする。`screened_switching_game:...`
+/// を明示指定したときはこの閾値を無視してユーザー指定をそのまま使う。
+pub const AUTO_SCREEN_TURN_LIMIT : Int = 4
+
+///|
+/// Auto-upgrade 時の既定 MC trials。`.claude/skills/nash/SKILL.md` の
+/// チューニングガイド (1000 trials × 400 セル) と揃える。
+pub const AUTO_SCREEN_TRIALS : Int = 1000
+
+///|
+/// Auto-upgrade 時の既定 MC seed (再現性担保)。
+pub const AUTO_SCREEN_SEED : UInt64 = 42
+
+///|
+/// Auto-upgrade 時の既定 keep_top_quantile。C(6,3)=20 selections で
+/// 6 retained ≒ Nash support を十分カバーする下限。
+pub const AUTO_SCREEN_KEEP_TOP : Double = 0.3
+
+///|
 /// Team-level payoff model for converting Pokemon team matchups into zero-sum
 /// selection matrices.
 ///
@@ -33,6 +56,25 @@ pub(all) enum TeamPayoffModel {
 /// A single-Pokemon combatant with moves and equipment. The underlying
 /// `Pokemon` carries base stats; `stat_system` controls Lv50 stat realisation
 /// (Standard EV252/IV31 or Champions SP).
+///
+/// `nature` / `actual_stats` は team-builder (またはユーザー) が実数値・
+/// 性格を確定させている場合のみ `Some`。`actual_stats` は 6 要素 (H/A/B/C/D/Spe)
+/// の Lv50 実数値。damage engine の `atk_nature` / `def_nature` /
+/// `atk_stat_override` / `def_stat_override` / `def_hp_override` へ流し込まれる
+/// ため、select は base_stats + 既定投資ではなく、ユーザーの実構築そのままの
+/// 打点を評価できる。両方 `None` のときは従来どおり engine デフォルト
+/// (攻撃側 max SP+性格 / 防御側 無投資) にフォールバックする。
+///
+/// `stat_points` は 6 要素 (H/A/B/C/D/Spe) の SP (Champions) / EV (Standard)。
+/// pre-mega の base_stats から `actual_stats` を再現できる「振り」そのもの。
+/// メガ進化で base が変わると pre-mega `actual_stats` がそのまま使えなくなる
+/// ため、`effective_combatant` がここから post-mega 実数値を再計算する。
+///
+/// `ivs` は Standard format 専用の 6 要素 IV 配列 (Champions は IV 廃止のため
+/// 無視)。post-mega 実数値の再計算時に必要で、欠損時は 31 揃い (= 完璧個体)
+/// を仮定する。ユーザーが敢えて 0 Atk 特殊アタッカーや 0 Spe トリルなど
+/// 非 31 IV で組んだとき、ここを通さないと post-mega の stat が勝手に 31 IV
+/// 基準にずれる。
 pub(all) struct Combatant {
   pokemon : @model.Pokemon
   moves : Array[@model.Move]
@@ -43,6 +85,10 @@ pub(all) struct Combatant {
   // メガ進化後のステータス差分。`None` なら mega 不可。`Some(_)` なら
   // `SwitchingGame` の `Mega` アクションで mega_form 値に切り替わる。
   mega_form : @model.MegaForm?
+  nature : @model.Nature?
+  stat_points : Array[Int]?
+  actual_stats : Array[Int]?
+  ivs : Array[Int]?
 } derive(Show)
 
 ///|

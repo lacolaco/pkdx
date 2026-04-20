@@ -153,26 +153,9 @@ ls box/teams/*.meta.json
 #### モデル選択肢 (`team_payoff_model` フィールド)
 
 - `"switching_game"` (既定) — 交代込み extensive-form ゲーム木。DP turn_limit=5 既定 (先制技 / ランク補正技に対応)。長期戦評価が必要なら `"switching_game:<N>"` で turn_limit を上書き可
-- `"screened_switching_game:<trials>:<seed>:<keep_top>"` — MC で選出行列を screening (rollout turn_limit=5)、下位を quantile cutoff で枝刈り、残存 sub-matrix だけ SwitchingGame DP (refine turn_limit=5 既定)。例: `"screened_switching_game:1000:42:0.3"`。refine turn_limit を上書きしたいときは `"screened_switching_game:<trials>:<seed>:<keep_top>:<turn_limit>"`
+- `"screened_switching_game:<trials>:<seed>:<keep_top>"` — MC で選出行列を screening (rollout turn_limit=5)、下位を quantile cutoff で枝刈り、残存 sub-matrix だけ SwitchingGame DP (refine turn_limit=5 既定)。例: `"screened_switching_game:1000:42:0.3"`。パラメータを細かくチューニングしたいときだけ明示指定する
 
-**チューニングガイド (ScreenedSwitchingGame)**:
-
-パラメータは 3 つ: `trials`, `seed`, `keep_top`。C(6,3)² = 400 セルの screening 空間を前提に設計。
-
-| パラメータ | 推奨範囲 | 既定推奨 | 根拠 |
-|---|---|---|---|
-| `trials` | 500–2000 | 1000 | √1000 ≈ 32 → MC 標準誤差 ≈ 1/32 ≈ 3%。400 セル × 1000 trials = 400K rollout で Phase A 2–5 秒 |
-| `keep_top` | 0.25–0.5 | 0.3 | 20 selections × 0.3 = 6 retained。Phase C コスト ∝ 6² = 36 セル (元の 9%)。Nash support サイズが通常 3–6 なので 0.3 で十分カバー |
-| `seed` | 任意 UInt64 | 42 | 再現性が必要なら固定。同一 seed で同一結果を保証 |
-
-**入力サイズ別ガイド**:
-- **C(4,3)=4 selections**: keep_top ≥ 0.5 推奨 (4 × 0.3 = 1.2 → ceil = 2 は少なすぎる)
-- **C(5,3)=10 selections**: keep_top=0.3–0.5 (3–5 retained)
-- **C(6,3)=20 selections**: keep_top=0.25–0.3 (5–6 retained)。典型的なシングル 6v6 ケース
-
-**Phase B 枝刈りの安全性**: screening 行列に Nash を解いてから、相手の Nash 均衡戦略下での期待値で各選出をスコアリングする。Nash support の選出はすべてゲーム値で同率首位になるため、`keep_top × n ≥ |Nash support|` であれば support が枝刈りされることはない。
-
-**重要な trade-off**: screening は MC 40000-80000 rollout のオーバヘッドを伴う。`switching_game` が単独で 10 秒以内に完走する場合、screening を挟むと逆に遅くなる。先に `time bin/pkdx select` で素の `switching_game` を計測し、30 秒以上かかるとき初めて `screened_switching_game` を使う。Nash value は両モデル間で一致することを合成データで確認済み。
+**CLI 側の自動フォールバック**: `switching_game:<N>` で `N >= 5` のとき、`pkdx select` は内部で `ScreenedSwitchingGame(trials=1000, seed=42, keep_top=0.3, refine_turn_limit=N)` に自動昇格する。skill 側で screening をどう使うか判断する必要はなく、常に `switching_game:<N>` で turn_limit だけ指定すればよい。明示的に `screened_switching_game:...` を書いた場合はそのまま使われる。
 
 詳細は `references/payoff_semantics.md`。
 
@@ -194,10 +177,10 @@ ls box/teams/*.meta.json
 
 ユーザーが「Other」で任意の正整数を入力した場合はそれを `<N>` に埋め込む。負値・0 は弾く。「ターン」を「先読み」「深さ」と言い換えても OK だが、`turn_limit` / `DP` などの内部用語はユーザー向け文面に出さないこと。
 
-**model 別のエンコード**:
+**エンコード**:
 
-- `switching_game` 選択時 → `"switching_game:<N>"`
-- `screened_switching_game` 選択時 → `"screened_switching_game:<trials>:<seed>:<keep_top>:<N>"` (4 番目のフィールドとして付与)
+- 基本は `"switching_game:<N>"` を組み立てるだけでよい。`N >= 5` のとき CLI が内部で screening 版に自動昇格するので、skill 側で `screened_switching_game:...` を構築する必要はない
+- screening パラメータ (`trials`/`seed`/`keep_top`) をユーザーが明示的に変更したい場合のみ `"screened_switching_game:<trials>:<seed>:<keep_top>:<N>"` を直接指定する
 
 ### 実行
 
@@ -312,13 +295,43 @@ JSON
 
 ## Phase 2d: `pkdx nash graph` — DOT 可視化
 
-同じ入力 (matrix / characters) で Graphviz DOT を出力。
+3 種類の入力を受け付ける:
+
+1. **matrix 形式**: 既知の利得行列を直接渡す
+2. **characters 形式**: monocycle (p, v) リストから自動生成
+3. **team + opponent 形式**: `pkdx select` と同じ Combatant JSON。`box/teams/*.meta.json` の `members` をそのまま流せる
 
 ```bash
+# matrix 形式
 cat <<'JSON' | $PKDX nash graph --threshold 0.5
 {"matrix": [[0, 1, -1], [-1, 0, 1], [1, -1, 0]], "labels": ["R", "P", "S"]}
 JSON
+
+# team + opponent 形式 (.meta.json 直接利用)
+jq -n \
+  --slurpfile team box/teams/<自>.meta.json \
+  --slurpfile opp  box/teams/<相手>.meta.json \
+  '{team: $team[0].members, opponent: $opp[0].members}' \
+  | $PKDX nash graph --threshold 0.2 > matchup.dot
+dot -Tpng matchup.dot -o matchup.png
 ```
+
+### team + opponent 形式の詳細
+
+- 入力フィールド: `team` / `opponent` (必須、Combatant 配列)、`stat_system` (任意、既定 `"champions"`)、`turn_limit` (任意、既定 `1`)
+- 行列サイズ: `(n + m) × (n + m)` の零和拡張。上半 `[0..n)` が自チーム、下半 `[n..n+m)` が相手チーム。同陣営ブロックは可視化用ゼロ埋め
+- ノード ID: `team_<i>` / `opp_<j>` の安定 ID + `label="..."` 属性。両陣営に同名ポケモンが居ても DOT で衝突しない
+- `labels` フィールドは指定不可（メンバー名から自動生成）。明示するとエラー
+- `matrix` / `characters` との同時指定もエラー
+
+#### turn_limit の使い分け
+
+| `turn_limit` | 評価方式 | コスト |
+|---|---|---|
+| `1` (既定) | 攻撃技の平均削り率差 (fast path) | 36セルで <1秒 |
+| `>=2` | `switching_game_winrate([a],[b],N)` 1v1 DP | turn_limit に応じて秒〜数十秒 |
+
+`turn_limit` を上げると積み技や交代評価が反映されるが、6×6=36 セルで全1v1 DP を解くため 5以上は本物の 6体構築では数十秒以上かかる。先に `1` で傾向を見てから必要なら上げる。
 
 `threshold` で |A[i,j]| がその値以下のエッジを削除。大きな行列の可視化で有効。
 

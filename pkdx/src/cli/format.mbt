@@ -134,15 +134,25 @@ fn moves_to_json(moves : Array[@model.Move]) -> String {
 }
 
 ///|
-/// Format stat_effects as JSON `[[stat, delta], ...]`.
-fn stat_effects_to_json(effs : Array[(Int, Int)]) -> String {
+/// Format `stat_effects` as a JSON array of 3-element tuples
+/// `[[stat, delta, target], ...]`. `target` is `0` = self, `1` = opp.
+/// Phase 3 contract used by `pkdx select` (which also accepts the legacy
+/// 2-element form for tests / older pipelines).
+fn stat_effects_to_json(effs : Array[@model.StatEffect]) -> String {
   let mut s = "["
   for i = 0; i < effs.length(); i = i + 1 {
     if i > 0 {
       s = s + ","
     }
-    let (a, b) = effs[i]
-    s = s + "[" + a.to_string() + "," + b.to_string() + "]"
+    let e = effs[i]
+    s = s +
+      "[" +
+      e.stat.to_string() +
+      "," +
+      e.delta.to_string() +
+      "," +
+      e.target.to_string() +
+      "]"
   }
   s + "]"
 }
@@ -302,7 +312,7 @@ fn damage_to_json(
     if i > 0 {
       pct_arr = pct_arr + ","
     }
-    pct_arr = pct_arr + format_pct(r.percents[i])
+    pct_arr = pct_arr + format_one_decimal(r.percents[i])
   }
   pct_arr = pct_arr + "]"
   let double_field = if input.is_double { ",\"double\":true" } else { "" }
@@ -347,9 +357,9 @@ fn damage_to_table(
     " ~ " +
     r.max_damage.to_string() +
     " (" +
-    format_pct(r.min_percent) +
+    format_one_decimal(r.min_percent) +
     "% ~ " +
-    format_pct(r.max_percent) +
+    format_one_decimal(r.max_percent) +
     "%)\n"
   s = s + "HP: " + r.defender_hp.to_string() + "\n"
   s = s + "Result: " + r.ko_text + "\n"
@@ -362,7 +372,7 @@ fn damage_to_table(
     let sep = if i > 0 { " | " } else { "" }
     labels = labels + sep + (85 + i).to_string()
     damages_str = damages_str + sep + r.damages[i].to_string()
-    pcts = pcts + sep + format_pct(r.percents[i]) + "%"
+    pcts = pcts + sep + format_one_decimal(r.percents[i]) + "%"
   }
   s = s + "Roll:   " + labels + "\n"
   s = s + "Damage: " + damages_str + "\n"
@@ -371,7 +381,9 @@ fn damage_to_table(
 }
 
 ///|
-fn format_pct(v : Double) -> String {
+/// Format a double with exactly one decimal digit (no %/unit suffix).
+/// Used for damage percentages and HBD scores.
+fn format_one_decimal(v : Double) -> String {
   let int_part = v.to_int()
   let frac = ((v - int_part.to_double()) * 10.0).to_int().abs()
   int_part.to_string() + "." + frac.to_string()
@@ -717,13 +729,6 @@ fn stat_reverse_pokemon_to_table(
 }
 
 ///|
-fn format_score(v : Double) -> String {
-  let int_part = v.to_int()
-  let frac = ((v - int_part.to_double()) * 10.0).to_int().abs()
-  int_part.to_string() + "." + frac.to_string()
-}
-
-///|
 fn hp_snap_label(snap : @model.HpSnap) -> String {
   match snap {
     NoSnap => "none"
@@ -789,7 +794,7 @@ fn hbd_to_json(
       ",\"spd\":" +
       c.spd.to_string() +
       "},\"score\":" +
-      format_score(c.score) +
+      format_one_decimal(c.score) +
       "}"
   }
   cand_arr = cand_arr + "]"
@@ -906,7 +911,7 @@ fn hbd_to_table(
         c.spd.to_string() +
         "\n"
     }
-    s = s + "\nScore: " + format_score(c.score) + "\n"
+    s = s + "\nScore: " + format_one_decimal(c.score) + "\n"
     return s
   }
   // Multi-solution ranked table
@@ -931,7 +936,7 @@ fn hbd_to_table(
       pad_right(c.hp.to_string(), 5) +
       pad_right(c.def_.to_string(), 5) +
       pad_right(c.spd.to_string(), 5) +
-      format_score(c.score) +
+      format_one_decimal(c.score) +
       "\n"
   }
   s

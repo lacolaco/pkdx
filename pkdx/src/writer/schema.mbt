@@ -19,49 +19,47 @@ fn strict_string(
 }
 
 ///|
+/// Build a 6-stat numeric object schema using the given key list.
+/// `keys` must be exactly 6 entries (HP, Atk, Def, SpA, SpD, Spe order).
+fn stats_schema(
+  b : @jsonschema.Builder,
+  keys : Array[String],
+) -> @jsonschema.JsonSchema {
+  let props : Map[String, @jsonschema.JsonSchema] = {}
+  for i = 0; i < keys.length(); i = i + 1 {
+    props[keys[i]] = b.number()
+  }
+  b.object(properties=props, required_all=true)
+}
+
+///|
 fn stats_schema_short(b : @jsonschema.Builder) -> @jsonschema.JsonSchema {
-  b.object(
-    properties={
-      "h": b.number(),
-      "a": b.number(),
-      "b": b.number(),
-      "c": b.number(),
-      "d": b.number(),
-      "s": b.number(),
-    },
-    required_all=true,
-  )
+  stats_schema(b, ["h", "a", "b", "c", "d", "s"])
 }
 
 ///|
 fn stats_schema_long(b : @jsonschema.Builder) -> @jsonschema.JsonSchema {
-  b.object(
-    properties={
-      "hp": b.number(),
-      "atk": b.number(),
-      "def": b.number(),
-      "spa": b.number(),
-      "spd": b.number(),
-      "spe": b.number(),
-    },
-    required_all=true,
-  )
+  stats_schema(b, ["hp", "atk", "def", "spa", "spd", "spe"])
 }
 
 ///|
+/// Move schema. When `with_accuracy` is set, adds the `accuracy` property
+/// (required shape for breed / pokemon-build caches).
 fn move_schema(
   b : @jsonschema.Builder,
   strict~ : Bool = true,
+  with_accuracy~ : Bool = false,
 ) -> @jsonschema.JsonSchema {
-  b.object(
-    properties={
-      "name": strict_string(b, strict~),
-      "type": b.string(),
-      "category": b.string(),
-      "power": b.number(),
-    },
-    required=["name", "type", "category"],
-  )
+  let props : Map[String, @jsonschema.JsonSchema] = {
+    "name": strict_string(b, strict~),
+    "type": b.string(),
+    "category": b.string(),
+    "power": b.number(),
+  }
+  if with_accuracy {
+    props["accuracy"] = b.number()
+  }
+  b.object(properties=props, required=["name", "type", "category"])
 }
 
 ///|
@@ -69,16 +67,7 @@ fn pokemon_move_schema(
   b : @jsonschema.Builder,
   strict~ : Bool = true,
 ) -> @jsonschema.JsonSchema {
-  b.object(
-    properties={
-      "name": strict_string(b, strict~),
-      "type": b.string(),
-      "category": b.string(),
-      "power": b.number(),
-      "accuracy": b.number(),
-    },
-    required=["name", "type", "category"],
-  )
+  move_schema(b, strict~, with_accuracy=true)
 }
 
 ///|
@@ -100,8 +89,19 @@ fn member_schema(
         min_items=moves_min,
         max_items=4,
       ),
+      // select が実数値/性格を使った damage 計算を行うために必要。
+      // 欠損 (null) 時は engine のデフォルト (攻撃側 max SP+性格 / 防御側 無投資) へフォールバック。
+      "nature": nullable(b, b.string()),
+      "stat_points": nullable(b, stats_schema_short(b)),
+      "actual_stats": nullable(b, stats_schema_short(b)),
+      // Standard format のみ使用する個体値 (H/A/B/C/D/S)。メガ進化後の実数値
+      // 再計算で非 31 IV のユーザ spread (0 Atk 特殊 / 0 Spe トリル等) を
+      // 保持するために必要。Champions は IV 廃止のため無視される。
+      "ivs": nullable(b, stats_schema_short(b)),
     },
-    required_all=true,
+    required=[
+      "name", "types", "base_stats", "ability", "item", "role", "moves",
+    ],
   )
 }
 

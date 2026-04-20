@@ -87,6 +87,11 @@ fn mk_move(
     learn_method: "",
     priority: 0,
     stat_effects: [],
+    status_effect: None,
+    recoil_num: 0,
+    recoil_den: 1,
+    self_ko: false,
+    recharge: false,
   }
 }
 
@@ -101,6 +106,8 @@ fn mk_damage_input(
   atk_stat_override? : Int = 0,
   def_stat_override? : Int = 0,
   def_hp_override? : Int = 0,
+  atk_nature? : @model.Nature? = None,
+  def_nature? : @model.Nature? = None,
   atk_ability? : String = "",
   def_ability? : String = "",
   atk_item? : String = "",
@@ -124,6 +131,8 @@ fn mk_damage_input(
     field,
     tera_type,
     critical,
+    atk_nature,
+    def_nature,
     atk_stat_override,
     def_stat_override,
     def_hp_override,

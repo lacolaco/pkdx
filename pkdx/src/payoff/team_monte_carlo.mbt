@@ -65,6 +65,10 @@ priv enum TeamAction {
 /// Pick a TeamAction for the given side under a stay-vs-best-switch greedy
 /// policy with ε-greedy exploration. When `active` is KO-d, returns the
 /// best forced switch (or `None` if the entire side has fainted).
+///
+/// When `must_recharge` is true the whole turn is forfeit (mainline Hyper
+/// Beam / Giga Impact behaviour); we emit a `TmUseMove(0)` placeholder that
+/// the caller will short-circuit to `acts=false`.
 fn greedy_team_action(
   active : Int,
   my_team : Array[Combatant],
@@ -75,7 +79,11 @@ fn greedy_team_action(
   opp_ranks : Array[Int],
   rng : @random.Rand,
   epsilon : Double,
+  must_recharge~ : Bool = false,
 ) -> TeamAction? {
+  if must_recharge && my_hps[active] > 0 {
+    return Some(TmUseMove(0))
+  }
   let alive_slots : Array[Int] = []
   for i in 0..<my_hps.length() {
     if my_hps[i] > 0 {
@@ -179,6 +187,42 @@ fn greedy_team_action(
 }
 
 ///|
+/// Apply team-level post-hit side effects after a `team_perform_attack`
+/// call. Mirrors `resolve_post_hit_effects` in the DP layer so the two
+/// resolvers agree on post-hit semantics.
+///
+/// Order matches the DP helper: `stat_effects` (self + opp-target with
+/// opp_alive gating) → recoil → self_ko → recharge. Applied for both
+/// damaging and status moves — `team_perform_attack` no longer resolves
+/// stat_effects for status moves; this helper is the single owner.
+fn team_apply_post_hit(
+  attacker_hps : Array[Int],
+  attacker_active : Int,
+  attacker_ranks : Array[Int],
+  attacker_must_recharge : Array[Bool],
+  defender_hps : Array[Int],
+  defender_active : Int,
+  defender_ranks : Array[Int],
+  mv : @model.Move,
+  dmg : Int,
+) -> Unit {
+  let opp_alive = defender_hps[defender_active] > 0
+  apply_stat_effects(attacker_ranks, defender_ranks, opp_alive, mv)
+  if mv.recoil_num > 0 && dmg > 0 {
+    let raw = dmg * mv.recoil_num / mv.recoil_den
+    let recoil = if raw < 1 { 1 } else { raw }
+    let new_hp = attacker_hps[attacker_active] - recoil
+    attacker_hps[attacker_active] = if new_hp < 0 { 0 } else { new_hp }
+  }
+  if mv.self_ko {
+    attacker_hps[attacker_active] = 0
+  }
+  if mv.recharge && attacker_hps[attacker_active] > 0 {
+    attacker_must_recharge[attacker_active] = true
+  }
+}
+
+///|
 /// Apply one pre-selected attack in the team rollout. Mirrors
 /// `perform_attack_with` in `monte_carlo.mbt` but free-standing so the team
 /// rollout stays self-contained.
@@ -190,14 +234,12 @@ fn team_perform_attack(
   rng : @random.Rand,
   atk_ranks : Array[Int],
   def_ranks : Array[Int],
+  atk_burn~ : Bool = false,
 ) -> Int {
   if mv.power <= 0 {
-    for eff in mv.stat_effects {
-      let (idx, delta) = eff
-      if idx >= 0 && idx < atk_ranks.length() {
-        atk_ranks[idx] = clamp_rank(atk_ranks[idx] + delta)
-      }
-    }
+    // Status moves: no damage and no in-place stat mutation. The caller
+    // applies `stat_effects` (with opp_alive gating) via
+    // `team_apply_post_hit` so both branches share one resolver.
     return defender_hp
   }
   let atk_rank = match mv.category {
@@ -216,7 +258,139 @@ fn team_perform_attack(
   if r.is_immune {
     return defender_hp
   }
-  defender_hp - r.damages[rng.int(limit=16)]
+  let raw = r.damages[rng.int(limit=16)]
+  // やけど + 物理: ダメージ半減。
+  let dmg = if atk_burn {
+    match mv.category {
+      @model.Physical => raw / 2
+      _ => raw
+    }
+  } else {
+    raw
+  }
+  defender_hp - dmg
+}
+
+///|
+/// Sample a Bernoulli outcome with success probability `p` in [0, 1] using
+/// `rng.int(limit=N)` quantised at 1/1_000_000 granularity.
+fn rand_bool(rng : @random.Rand, p : Double) -> Bool {
+  if p <= 0.0 {
+    return false
+  }
+  if p >= 1.0 {
+    return true
+  }
+  rng.int(limit=1000000).to_double() / 1000000.0 < p
+}
+
+///|
+/// Resolve a single attack attempt for `me` in the MC rollout, respecting
+/// paralysis (12.5% failure), sleep (skip + counter decrement / wake-up),
+/// and move accuracy. Returns the new status of `me` and whether the action
+/// executes this turn.
+fn mc_resolve_attempt(
+  status : @model.StatusCondition,
+  mv_acc : Int,
+  rng : @random.Rand,
+) -> (@model.StatusCondition, Bool) {
+  match status {
+    @model.Sleep(n) => {
+      if n > 0 {
+        return (@model.Sleep(n - 1), false)
+      }
+      // Sleep(0): wake up and act subject to accuracy below.
+      let acts = rand_bool(rng, mv_acc.to_double() / 100.0)
+      (@model.None, acts)
+    }
+    @model.Paralyze => {
+      if rand_bool(rng, PARALYZE_SKIP_RATE) {
+        return (@model.Paralyze, false)
+      }
+      let acts = rand_bool(rng, mv_acc.to_double() / 100.0)
+      (@model.Paralyze, acts)
+    }
+    other => {
+      let acts = rand_bool(rng, mv_acc.to_double() / 100.0)
+      (other, acts)
+    }
+  }
+}
+
+///|
+/// MC rollout variant of `maybe_apply_status_fanout` — samples the chance
+/// roll directly. Mutates `defender_status_arr[defender_slot]` in place when
+/// the status lands (ignored when already statused, type immune, fainted, or
+/// the chance roll fails).
+fn mc_try_apply_status(
+  rng : @random.Rand,
+  mv : @model.Move,
+  defender_team : Array[Combatant],
+  defender_hps : Array[Int],
+  defender_status_arr : Array[@model.StatusCondition],
+  defender_slot : Int,
+) -> Unit {
+  let eff = match mv.status_effect {
+    None => return
+    Some(x) => x
+  }
+  let (kind, chance) = eff
+  if chance <= 0 {
+    return
+  }
+  if defender_hps[defender_slot] <= 0 {
+    return
+  }
+  if defender_status_arr[defender_slot] != @model.None {
+    return
+  }
+  let c = defender_team[defender_slot]
+  if @model.immune_to_status(kind, c.pokemon.type1, c.pokemon.type2) {
+    return
+  }
+  if not(rand_bool(rng, chance.to_double() / 100.0)) {
+    return
+  }
+  defender_status_arr[defender_slot] = @model.inflict_status(kind)
+}
+
+///|
+/// Apply end-of-turn slip damage for one side's active slot. Mirrors
+/// `eot_slip_active` from switching_game but operates on mutable team arrays.
+fn mc_eot_slip(
+  max_hp : Int,
+  current_hp : Int,
+  status : @model.StatusCondition,
+) -> (Int, @model.StatusCondition) {
+  if current_hp <= 0 {
+    return (current_hp, status)
+  }
+  match status {
+    @model.Burn => {
+      let dmg = max_hp / 16
+      let h = current_hp - dmg
+      (if h < 0 { 0 } else { h }, status)
+    }
+    @model.Poison => {
+      let dmg = max_hp / 8
+      let h = current_hp - dmg
+      (if h < 0 { 0 } else { h }, status)
+    }
+    @model.BadPoison(n) => {
+      let ticks = if n + 1 > TOXIC_MAX_TICKS { TOXIC_MAX_TICKS } else { n + 1 }
+      let dmg = max_hp * ticks / 16
+      let h = current_hp - dmg
+      (if h < 0 { 0 } else { h }, @model.BadPoison(ticks))
+    }
+    @model.Drowsy(n) => {
+      if n > 0 {
+        (current_hp, @model.Drowsy(n - 1))
+      } else {
+        (current_hp, @model.Sleep(2))
+      }
+    }
+    _ => (current_hp, status)
+  }
 }
 
 ///|
@@ -245,16 +419,44 @@ pub fn team_rollout(
   }
   let own_ranks = [0, 0, 0, 0, 0]
   let opp_ranks = [0, 0, 0, 0, 0]
+  let own_status : Array[@model.StatusCondition] = Array::make(
+    own.length(), @model.None,
+  )
+  let opp_status : Array[@model.StatusCondition] = Array::make(
+    opp.length(), @model.None,
+  )
+  // Per-slot recharge flag. Set by a recharge move (Hyper Beam etc.) landing;
+  // consumed next turn by forcing a skipped UseMove. Switching is blocked
+  // during recharge (matches mainline), so the flag only clears at end-of-
+  // turn after the forced skip.
+  let own_must_recharge : Array[Bool] = Array::make(own.length(), false)
+  let opp_must_recharge : Array[Bool] = Array::make(opp.length(), false)
   let mut own_active = 0
   let mut opp_active = 0
   for _ in 0..<turn_limit {
     let a_own = greedy_team_action(
-      own_active, own, own_hps, own_ranks, opp_active, opp, opp_ranks, rng,
+      own_active,
+      own,
+      own_hps,
+      own_ranks,
+      opp_active,
+      opp,
+      opp_ranks,
+      rng,
       epsilon,
+      must_recharge=own_must_recharge[own_active],
     )
     let a_opp = greedy_team_action(
-      opp_active, opp, opp_hps, opp_ranks, own_active, own, own_ranks, rng,
+      opp_active,
+      opp,
+      opp_hps,
+      opp_ranks,
+      own_active,
+      own,
+      own_ranks,
+      rng,
       epsilon,
+      must_recharge=opp_must_recharge[opp_active],
     )
     match (a_own, a_opp) {
       (None, _) => return -1.0
@@ -268,10 +470,56 @@ pub fn team_rollout(
           TmSwitch(_) => true
           _ => false
         }
-        // Step 1: apply any switches first (both sides' switches resolve
-        // simultaneously before move execution in this simplified screener).
+        // Capture turn-start active indices + recharge flags. Consumed at
+        // turn end only for the *start-of-turn* slot (keyed off the captured
+        // index, not the post-switch `*_active`) so a mid-turn switch can't
+        // clear a freshly-set flag on the switched-in Pokemon. Mirrors
+        // `clear_consumed_recharge` in the DP layer.
+        let own_start_active = own_active
+        let opp_start_active = opp_active
+        let own_start_recharging = own_must_recharge[own_start_active]
+        let opp_start_recharging = opp_must_recharge[opp_start_active]
+        // Step 1: resolve status-phase attempts for move attempts (switches are
+        // always successful and bypass sleep / paralyze). Recharge short-
+        // circuits UseMove to `acts=false` regardless of status.
+        let mut own_attempt_acts = true
+        let mut opp_attempt_acts = true
+        match ao {
+          TmUseMove(mi) => {
+            if own_start_recharging {
+              own_attempt_acts = false
+            } else {
+              let (st, acts) = mc_resolve_attempt(
+                own_status[own_active], own[own_active].moves[mi].accuracy, rng,
+              )
+              own_status[own_active] = st
+              own_attempt_acts = acts
+            }
+          }
+          _ => ()
+        }
+        match ap {
+          TmUseMove(mi) => {
+            if opp_start_recharging {
+              opp_attempt_acts = false
+            } else {
+              let (st, acts) = mc_resolve_attempt(
+                opp_status[opp_active], opp[opp_active].moves[mi].accuracy, rng,
+              )
+              opp_status[opp_active] = st
+              opp_attempt_acts = acts
+            }
+          }
+          _ => ()
+        }
+        // Step 2: apply switches. Reset toxic counter on the switched-out
+        // slot. (Switches are never chosen while must_recharge is set, so
+        // there is no recharge flag to clear here.)
         match ao {
           TmSwitch(i) => {
+            own_status[own_active] = reset_toxic_counter_on_switch(
+              own_status[own_active],
+            )
             own_active = i
             reset_ranks(own_ranks)
           }
@@ -279,14 +527,16 @@ pub fn team_rollout(
         }
         match ap {
           TmSwitch(i) => {
+            opp_status[opp_active] = reset_toxic_counter_on_switch(
+              opp_status[opp_active],
+            )
             opp_active = i
             reset_ranks(opp_ranks)
           }
           _ => ()
         }
-        // Step 2: resolve moves. Only the side that did not switch attacks.
+        // Step 3: resolve moves honouring paralysis speed halving and skips.
         if not(own_switches) && not(opp_switches) {
-          // Both moves fire in priority / speed order.
           let mi_own = match ao {
             TmUseMove(i) => i
             _ => -1
@@ -297,14 +547,24 @@ pub fn team_rollout(
           }
           let mv_own = own[own_active].moves[mi_own]
           let mv_opp = opp[opp_active].moves[mi_opp]
-          let eff_spe_own = effective_speed(
+          let base_spe_own = effective_speed(
             own[own_active].pokemon.spe,
             own_ranks[4],
           )
-          let eff_spe_opp = effective_speed(
+          let base_spe_opp = effective_speed(
             opp[opp_active].pokemon.spe,
             opp_ranks[4],
           )
+          let eff_spe_own = if is_paralyzed(own_status[own_active]) {
+            base_spe_own / 2
+          } else {
+            base_spe_own
+          }
+          let eff_spe_opp = if is_paralyzed(opp_status[opp_active]) {
+            base_spe_opp / 2
+          } else {
+            base_spe_opp
+          }
           let s = turn_order_sign(
             own[own_active], mv_own.priority, eff_spe_own, opp[opp_active],
             mv_opp.priority, eff_spe_opp,
@@ -316,71 +576,213 @@ pub fn team_rollout(
           } else {
             rng.boolean()
           }
+          // Pre-first-leg statuses. Captured so the second leg can detect a
+          // mid-turn sleep (Spore/Hypnosis) that locks the target out and read
+          // the post-first-leg burn (Will-O-Wisp halving physical damage).
+          let own_pre_status = own_status[own_active]
+          let opp_pre_status = opp_status[opp_active]
           if own_first {
-            opp_hps[opp_active] = team_perform_attack(
-              own[own_active], opp[opp_active], opp_hps[opp_active], mv_own,
-              rng, own_ranks, opp_ranks,
-            )
-            if all_ko(opp_hps) {
-              return 1.0
-            }
-            if opp_hps[opp_active] > 0 {
-              own_hps[own_active] = team_perform_attack(
-                opp[opp_active], own[own_active], own_hps[own_active], mv_opp,
-                rng, opp_ranks, own_ranks,
+            let mut opp_blocked_mid_turn = false
+            if own_attempt_acts {
+              let before = opp_hps[opp_active]
+              opp_hps[opp_active] = team_perform_attack(
+                own[own_active], opp[opp_active], before, mv_own,
+                rng, own_ranks, opp_ranks, atk_burn=is_burned(own_pre_status),
+              )
+              team_apply_post_hit(
+                own_hps, own_active, own_ranks, own_must_recharge,
+                opp_hps, opp_active, opp_ranks,
+                mv_own, before - opp_hps[opp_active],
+              )
+              mc_try_apply_status(
+                rng, mv_own, opp, opp_hps, opp_status, opp_active,
               )
               if all_ko(own_hps) {
                 return -1.0
               }
+              if all_ko(opp_hps) {
+                return 1.0
+              }
+              if action_blocked_by_fresh_status(
+                opp_pre_status,
+                opp_status[opp_active],
+              ) {
+                opp_blocked_mid_turn = true
+              }
+            }
+            if opp_hps[opp_active] > 0 &&
+              own_hps[own_active] > 0 &&
+              opp_attempt_acts &&
+              not(opp_blocked_mid_turn) {
+              // Read burn *after* first leg's status fan-out so a fresh burn
+              // from own's move halves opp's physical damage this turn.
+              let opp_burn_now = is_burned(opp_status[opp_active])
+              let before = own_hps[own_active]
+              own_hps[own_active] = team_perform_attack(
+                opp[opp_active], own[own_active], before, mv_opp,
+                rng, opp_ranks, own_ranks, atk_burn=opp_burn_now,
+              )
+              team_apply_post_hit(
+                opp_hps, opp_active, opp_ranks, opp_must_recharge,
+                own_hps, own_active, own_ranks,
+                mv_opp, before - own_hps[own_active],
+              )
+              mc_try_apply_status(
+                rng, mv_opp, own, own_hps, own_status, own_active,
+              )
+              if all_ko(own_hps) {
+                return -1.0
+              }
+              if all_ko(opp_hps) {
+                return 1.0
+              }
             }
           } else {
-            own_hps[own_active] = team_perform_attack(
-              opp[opp_active], own[own_active], own_hps[own_active], mv_opp,
-              rng, opp_ranks, own_ranks,
-            )
-            if all_ko(own_hps) {
-              return -1.0
-            }
-            if own_hps[own_active] > 0 {
-              opp_hps[opp_active] = team_perform_attack(
-                own[own_active], opp[opp_active], opp_hps[opp_active], mv_own,
-                rng, own_ranks, opp_ranks,
+            let mut own_blocked_mid_turn = false
+            if opp_attempt_acts {
+              let before = own_hps[own_active]
+              own_hps[own_active] = team_perform_attack(
+                opp[opp_active], own[own_active], before, mv_opp,
+                rng, opp_ranks, own_ranks, atk_burn=is_burned(opp_pre_status),
               )
+              team_apply_post_hit(
+                opp_hps, opp_active, opp_ranks, opp_must_recharge,
+                own_hps, own_active, own_ranks,
+                mv_opp, before - own_hps[own_active],
+              )
+              mc_try_apply_status(
+                rng, mv_opp, own, own_hps, own_status, own_active,
+              )
+              if all_ko(own_hps) {
+                return -1.0
+              }
+              if all_ko(opp_hps) {
+                return 1.0
+              }
+              if action_blocked_by_fresh_status(
+                own_pre_status,
+                own_status[own_active],
+              ) {
+                own_blocked_mid_turn = true
+              }
+            }
+            if own_hps[own_active] > 0 &&
+              opp_hps[opp_active] > 0 &&
+              own_attempt_acts &&
+              not(own_blocked_mid_turn) {
+              let own_burn_now = is_burned(own_status[own_active])
+              let before = opp_hps[opp_active]
+              opp_hps[opp_active] = team_perform_attack(
+                own[own_active], opp[opp_active], before, mv_own,
+                rng, own_ranks, opp_ranks, atk_burn=own_burn_now,
+              )
+              team_apply_post_hit(
+                own_hps, own_active, own_ranks, own_must_recharge,
+                opp_hps, opp_active, opp_ranks,
+                mv_own, before - opp_hps[opp_active],
+              )
+              mc_try_apply_status(
+                rng, mv_own, opp, opp_hps, opp_status, opp_active,
+              )
+              if all_ko(own_hps) {
+                return -1.0
+              }
               if all_ko(opp_hps) {
                 return 1.0
               }
             }
           }
         } else if not(own_switches) {
-          // Only own attacks (opp switched into a fresh slot this turn).
           let mi_own = match ao {
             TmUseMove(i) => i
             _ => -1
           }
           let mv_own = own[own_active].moves[mi_own]
-          opp_hps[opp_active] = team_perform_attack(
-            own[own_active], opp[opp_active], opp_hps[opp_active], mv_own, rng,
-            own_ranks, opp_ranks,
-          )
-          if all_ko(opp_hps) {
-            return 1.0
+          let own_burn = is_burned(own_status[own_active])
+          if own_attempt_acts {
+            let before = opp_hps[opp_active]
+            opp_hps[opp_active] = team_perform_attack(
+              own[own_active], opp[opp_active], before, mv_own,
+              rng, own_ranks, opp_ranks, atk_burn=own_burn,
+            )
+            team_apply_post_hit(
+              own_hps, own_active, own_ranks, own_must_recharge,
+              opp_hps, opp_active, opp_ranks,
+              mv_own, before - opp_hps[opp_active],
+            )
+            mc_try_apply_status(
+              rng, mv_own, opp, opp_hps, opp_status, opp_active,
+            )
+            if all_ko(own_hps) {
+              return -1.0
+            }
+            if all_ko(opp_hps) {
+              return 1.0
+            }
           }
         } else if not(opp_switches) {
-          // Only opp attacks (own switched in).
           let mi_opp = match ap {
             TmUseMove(i) => i
             _ => -1
           }
           let mv_opp = opp[opp_active].moves[mi_opp]
-          own_hps[own_active] = team_perform_attack(
-            opp[opp_active], own[own_active], own_hps[own_active], mv_opp, rng,
-            opp_ranks, own_ranks,
-          )
-          if all_ko(own_hps) {
-            return -1.0
+          let opp_burn = is_burned(opp_status[opp_active])
+          if opp_attempt_acts {
+            let before = own_hps[own_active]
+            own_hps[own_active] = team_perform_attack(
+              opp[opp_active], own[own_active], before, mv_opp,
+              rng, opp_ranks, own_ranks, atk_burn=opp_burn,
+            )
+            team_apply_post_hit(
+              opp_hps, opp_active, opp_ranks, opp_must_recharge,
+              own_hps, own_active, own_ranks,
+              mv_opp, before - own_hps[own_active],
+            )
+            mc_try_apply_status(
+              rng, mv_opp, own, own_hps, own_status, own_active,
+            )
+            if all_ko(own_hps) {
+              return -1.0
+            }
+            if all_ko(opp_hps) {
+              return 1.0
+            }
           }
         }
-        // Both sides switched → no damage this turn, just continue.
+        // Clear recharge flag for the slot that entered the turn already
+        // recharging — one-turn penalty is paid. Keyed off the captured
+        // start-of-turn index so a mid-turn switch + fresh recharge hit
+        // on the switched-in slot is not mistakenly cleared.
+        if own_start_recharging &&
+          own_start_active >= 0 &&
+          own_start_active < own_must_recharge.length() {
+          own_must_recharge[own_start_active] = false
+        }
+        if opp_start_recharging &&
+          opp_start_active >= 0 &&
+          opp_start_active < opp_must_recharge.length() {
+          opp_must_recharge[opp_start_active] = false
+        }
+        // Step 4: end-of-turn slip damage on each active (both still alive
+        // below; dead slots are handled by `all_ko` earlier).
+        let own_max = effective_hp(own[own_active])
+        let opp_max = effective_hp(opp[opp_active])
+        let (new_own_hp, new_own_st) = mc_eot_slip(
+          own_max, own_hps[own_active], own_status[own_active],
+        )
+        own_hps[own_active] = new_own_hp
+        own_status[own_active] = new_own_st
+        let (new_opp_hp, new_opp_st) = mc_eot_slip(
+          opp_max, opp_hps[opp_active], opp_status[opp_active],
+        )
+        opp_hps[opp_active] = new_opp_hp
+        opp_status[opp_active] = new_opp_st
+        if all_ko(own_hps) {
+          return -1.0
+        }
+        if all_ko(opp_hps) {
+          return 1.0
+        }
       }
     }
   }

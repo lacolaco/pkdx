@@ -20,6 +20,7 @@
 ///   "mega_form": {"atk":Int, "def":Int, "spa":Int, "spd":Int, "spe":Int,
 ///                 "type1":String, "type2":String, "ability":String,
 ///                 "name_ja":String}?,  // optional; present if mega-capable
+///   "ivs": {"h":Int, "a":Int, "b":Int, "c":Int, "d":Int, "s":Int}?,
 ///   "moves":   [{"name":..., "type":..., "category":"物理"|"特殊"|"変化",
 ///                "power":Int, "priority":Int?, "stat_effects":[[Int,Int], ...]?}, ...]
 /// }
@@ -66,16 +67,49 @@ fn parse_move_json(j : Json, ctx : String) -> @model.Move raise NashCliError {
         Some(Array(arr)) => parse_stat_effects_array(arr)
         _ => []
       }
+      let accuracy = match m.get("accuracy") {
+        Some(Number(n, ..)) => n.to_int()
+        _ => 100
+      }
+      let status_effect = match m.get("status_effect") {
+        Some(Object(se)) => parse_status_effect_object(se)
+        _ => None
+      }
+      let recoil_num = match m.get("recoil_num") {
+        Some(Number(n, ..)) => n.to_int()
+        _ => 0
+      }
+      let recoil_den = match m.get("recoil_den") {
+        Some(Number(n, ..)) => {
+          let v = n.to_int()
+          // Guard against zero denominator upstream; treat as no-recoil.
+          if v <= 0 { 1 } else { v }
+        }
+        _ => 1
+      }
+      let self_ko = match m.get("self_ko") {
+        Some(True) => true
+        _ => false
+      }
+      let recharge = match m.get("recharge") {
+        Some(True) => true
+        _ => false
+      }
       {
         name,
         type_,
         category,
         power,
-        accuracy: 100,
+        accuracy,
         pp: 10,
         learn_method: "",
         priority,
         stat_effects,
+        status_effect,
+        recoil_num,
+        recoil_den,
+        self_ko,
+        recharge,
       }
     }
     _ => raise InvalidJson(ctx + " must be an object")
@@ -83,29 +117,69 @@ fn parse_move_json(j : Json, ctx : String) -> @model.Move raise NashCliError {
 }
 
 ///|
-/// Parse a JSON array of `[stat_index, delta]` pairs. Non-conforming entries
-/// are silently skipped (e.g. wrong arity, non-numeric members); a malformed
-/// JSON that parsed as an Array still yields an empty effect list rather than
-/// raising.
-fn parse_stat_effects_array(arr : Array[Json]) -> Array[(Int, Int)] {
-  let out : Array[(Int, Int)] = []
+/// Parse `{"kind": "まひ" | "やけど" | ...,"chance": 100}` into a
+/// `(StatusKind, Int)` tuple. Missing or unknown kind yields `None`; a
+/// missing `chance` defaults to 100.
+fn parse_status_effect_object(
+  m : Map[String, Json],
+) -> (@model.StatusKind, Int)? {
+  let kind = match m.get("kind") {
+    Some(String(s)) => @model.status_kind_from_jp(s)
+    _ => None
+  }
+  match kind {
+    None => None
+    Some(k) => {
+      let chance = match m.get("chance") {
+        Some(Number(n, ..)) => n.to_int()
+        _ => 100
+      }
+      Some((k, chance))
+    }
+  }
+}
+
+///|
+/// Parse a JSON array of stat-effect entries. Accepts two shapes so existing
+/// `pkdx moves` output keeps working while the new 3-element form flows
+/// through:
+///
+/// - 2-element `[stat, delta]` — legacy; `target` defaults to `0` (self)
+/// - 3-element `[stat, delta, target]` — `target` 0=self, 1=opp
+///
+/// Non-conforming entries (wrong arity, non-numeric members) are silently
+/// skipped; a malformed JSON that still parsed as an Array yields an empty
+/// effect list rather than raising.
+fn parse_stat_effects_array(arr : Array[Json]) -> Array[@model.StatEffect] {
+  let out : Array[@model.StatEffect] = []
   for item in arr {
     match item {
-      Array(pair) =>
-        if pair.length() == 2 {
-          let a = match pair[0] {
+      Array(triple) => {
+        let len = triple.length()
+        if len == 2 || len == 3 {
+          let a = match triple[0] {
             Number(n, ..) => Some(n.to_int())
             _ => None
           }
-          let b = match pair[1] {
+          let b = match triple[1] {
             Number(n, ..) => Some(n.to_int())
             _ => None
+          }
+          let t = if len == 3 {
+            match triple[2] {
+              Number(n, ..) => n.to_int()
+              _ => 0
+            }
+          } else {
+            0
           }
           match (a, b) {
-            (Some(ai), Some(bi)) => out.push((ai, bi))
+            (Some(ai), Some(bi)) =>
+              out.push(@model.StatEffect::{ stat: ai, delta: bi, target: t })
             _ => ()
           }
         }
+      }
       _ => ()
     }
   }
@@ -239,6 +313,11 @@ fn parse_combatant_json(
             learn_method: "",
             priority: 0,
             stat_effects: [],
+            status_effect: None,
+            recoil_num: 0,
+            recoil_den: 1,
+            self_ko: false,
+            recharge: false,
           })
           for i in 0..<arr.length() {
             out[i] = parse_move_json(
@@ -253,6 +332,10 @@ fn parse_combatant_json(
         Some(mj) => Some(parse_mega_form_json(mj, ctx + ".mega_form"))
         None => None
       }
+      let nature = parse_nature_field(m, ctx)
+      let stat_points = parse_stat_points_field(m)
+      let actual_stats = parse_actual_stats_field(m)
+      let ivs = parse_ivs_field(m)
       {
         pokemon: poke,
         moves,
@@ -261,9 +344,120 @@ fn parse_combatant_json(
         tera_type: parse_str_field(m, "tera"),
         stat_system,
         mega_form,
+        nature,
+        stat_points,
+        actual_stats,
+        ivs,
       }
     }
     _ => raise InvalidJson(ctx + " must be an object")
+  }
+}
+
+///|
+/// `nature` (日本語名) を `@model.Nature` へ解決する。
+///
+/// 振る舞い:
+///   - キー欠損 / 明示 `null` / 空文字 → `None` (engine 既定にフォールバック)。
+///   - 既知の性格名 → `Some(nature)`。
+///   - 未知の文字列 / 文字列以外 → `InvalidJson` を raise。
+///
+/// 未知文字列を `None` に丸めてしまうと、damage engine の "攻撃側 None = +10% 補正"
+/// 既定により、typo (例: `"ようき "` の末尾空白) の入力が黙って攻撃を底上げする。
+/// select の数値は payoff 行列に直接効くので、検出可能な入力エラーは
+/// 失敗させてユーザに気付かせる方針。
+fn parse_nature_field(
+  m : Map[String, Json],
+  ctx : String,
+) -> @model.Nature? raise NashCliError {
+  match m.get("nature") {
+    None => None
+    Some(Null) => None
+    Some(String(s)) => {
+      if s.length() == 0 {
+        return None
+      }
+      match @model.nature_from_ja(s) {
+        Some(n) => Some(n)
+        None =>
+          raise InvalidJson(
+            ctx +
+            ".nature: unknown nature name " +
+            s +
+            " (expected a Japanese nature name like 'ようき' / 'ひかえめ')",
+          )
+      }
+    }
+    Some(_) => raise InvalidJson(ctx + ".nature must be a string")
+  }
+}
+
+///|
+/// `stat_points`: `{h,a,b,c,d,s}` 形式の 6 要素 SP (Champions) / EV (Standard)。
+/// post-mega 実数値の再計算に使う「振り」そのもので、`actual_stats` と違い
+/// engine override には直接渡らない。スキーマ的には `actual_stats` と同じ
+/// short key 形式のみ受け付ける。欠損・部分欠損は `None` (= 再計算不可、
+/// post-mega は engine 既定投資にフォールバック)。
+fn parse_stat_points_field(m : Map[String, Json]) -> Array[Int]? {
+  match m.get("stat_points") {
+    Some(Object(st)) => {
+      let keys = ["h", "a", "b", "c", "d", "s"]
+      let out : Array[Int] = Array::make(6, 0)
+      for i in 0..<6 {
+        match st.get(keys[i]) {
+          Some(Number(n, ..)) => out[i] = n.to_int()
+          _ => return None
+        }
+      }
+      Some(out)
+    }
+    _ => None
+  }
+}
+
+///|
+/// `actual_stats`: `{h,a,b,c,d,s}` の 6 要素を HP/Atk/Def/SpA/SpD/Spe 順の
+/// 配列として返す。team-builder の cache スキーマと揃えた short key 形式のみ
+/// 受け付ける (long key は breed 側の pokemon_schema 専用)。欠損・部分欠損は
+/// `None` にフォールバックする (厳密にして skill 側のバグを隠したくないが、
+/// 既存の base_stats だけで動いていたケースの後方互換を取るため optional)。
+fn parse_actual_stats_field(m : Map[String, Json]) -> Array[Int]? {
+  match m.get("actual_stats") {
+    Some(Object(st)) => {
+      let keys = ["h", "a", "b", "c", "d", "s"]
+      let out : Array[Int] = Array::make(6, 0)
+      for i in 0..<6 {
+        match st.get(keys[i]) {
+          Some(Number(n, ..)) => out[i] = n.to_int()
+          _ => return None
+        }
+      }
+      Some(out)
+    }
+    _ => None
+  }
+}
+
+///|
+/// `ivs`: `{h,a,b,c,d,s}` 形式の 6 要素 IV (Standard format 専用)。
+/// post-mega 実数値の再計算で使う「個体値」そのもの。Champions は IV 廃止
+/// のため読み込んでも damage/stat 計算では無視される (schema 側でも Standard
+/// 構築のみに emit する運用)。キー欠損・部分欠損は `None` フォールバックで、
+/// recompute_actual_stats_for_mega 側で 31 揃い (完璧個体) を仮定する。
+fn parse_ivs_field(m : Map[String, Json]) -> Array[Int]? {
+  match m.get("ivs") {
+    Some(Object(st)) => {
+      let keys = ["h", "a", "b", "c", "d", "s"]
+      let out : Array[Int] = Array::make(6, 0)
+      for i in 0..<6 {
+        match st.get(keys[i]) {
+          Some(Number(n, ..)) => out[i] = n.to_int()
+          _ => return None
+        }
+      }
+      Some(out)
+    }
+    _ => None
   }
 }
 
@@ -341,6 +535,10 @@ fn mk_empty_combatant() -> Combatant {
     tera_type: "",
     stat_system: @model.Champions,
     mega_form: None,
+    nature: None,
+    stat_points: None,
+    actual_stats: None,
+    ivs: None,
   }
 }
 
@@ -450,6 +648,20 @@ fn parse_screened_spec(rest : String) -> TeamPayoffModel raise NashCliError {
     None => DP_TURN_LIMIT
   }
   ScreenedSwitchingGame(trials, seed, keep_top, refine_tl)
+}
+
+///|
+/// `SwitchingGame(N)` で N が閾値以上なら `ScreenedSwitchingGame` に自動昇格する。
+/// ユーザーが `screened_switching_game:...` を明示したケースは match されず
+/// そのまま通る。閾値・既定 MC パラメータは `semantics.mbt` の定数に集約。
+fn auto_upgrade_team_model(m : TeamPayoffModel) -> TeamPayoffModel {
+  match m {
+    SwitchingGame(n) if n >= AUTO_SCREEN_TURN_LIMIT =>
+      ScreenedSwitchingGame(
+        AUTO_SCREEN_TRIALS, AUTO_SCREEN_SEED, AUTO_SCREEN_KEEP_TOP, n,
+      )
+    _ => m
+  }
 }
 
 ///|
@@ -606,26 +818,12 @@ fn build_select_result(
 
 ///|
 fn fmt_int_2d(xs : Array[Array[Int]]) -> String {
-  let mut s = "["
-  for i in 0..<xs.length() {
-    if i > 0 {
-      s = s + ","
-    }
-    s = s + fmt_int_array(xs[i])
-  }
-  s + "]"
+  fmt_json_array(xs, fmt_int_array)
 }
 
 ///|
 fn fmt_string_2d(xs : Array[Array[String]]) -> String {
-  let mut s = "["
-  for i in 0..<xs.length() {
-    if i > 0 {
-      s = s + ","
-    }
-    s = s + fmt_string_array(xs[i])
-  }
-  s + "]"
+  fmt_json_array(xs, fmt_string_array)
 }
 
 ///|
@@ -680,11 +878,12 @@ pub fn run_select(input_json : String) -> String raise NashCliError {
     Some(String(s)) => parse_format(s)
     _ => Single
   }
-  let team_model = match obj.get("team_payoff_model") {
+  let raw_team_model = match obj.get("team_payoff_model") {
     Some(String(s)) => parse_team_payoff_model(s)
     Some(_) => raise InvalidJson("team_payoff_model must be a string")
     None => SwitchingGame(DP_TURN_LIMIT)
   }
+  let team_model = auto_upgrade_team_model(raw_team_model)
   match (format, team_model) {
     (Double, SwitchingGame(_)) =>
       raise InvalidJson(
