@@ -1,1 +1,516 @@
-{"battle_format":"singles","mechanics":"メガシンカ","version":"champions","regulation":"M-A","phase":8,"members":[{"name":"ガブリアス","types":["ドラゴン","じめん"],"base_stats":{"h":108,"a":130,"b":95,"c":80,"d":85,"s":102},"ability":"さめはだ","item":"きあいのタスキ","role":"物理エース / ステロ展開","moves":[{"name":"じしん","type":"じめん","category":"物理","power":100},{"name":"げきりん","type":"ドラゴン","category":"物理","power":120},{"name":"がんせきふうじ","type":"いわ","category":"物理","power":60},{"name":"ステルスロック","type":"いわ","category":"変化","power":0}]},{"name":"ブリジュラス","types":["はがね","ドラゴン"],"base_stats":{"h":90,"a":105,"b":130,"c":125,"d":65,"s":85},"ability":"じきゅうりょく","item":"たべのこし","role":"特殊アタッカー (C振り調整)","moves":[{"name":"りゅうせいぐん","type":"ドラゴン","category":"特殊","power":130},{"name":"ラスターカノン","type":"はがね","category":"特殊","power":80},{"name":"10まんボルト","type":"でんき","category":"特殊","power":90},{"name":"はどうだん","type":"かくとう","category":"特殊","power":80}]},{"name":"アシレーヌ","types":["みず","フェアリー"],"base_stats":{"h":80,"a":74,"b":74,"c":126,"d":116,"s":60},"ability":"げきりゅう","item":"オボンのみ","role":"物理受け / みがめいそう積み (B特化)","moves":[{"name":"ムーンフォース","type":"フェアリー","category":"特殊","power":95},{"name":"うたかたのアリア","type":"みず","category":"特殊","power":90},{"name":"みがわり","type":"ノーマル","category":"変化","power":0},{"name":"めいそう","type":"エスパー","category":"変化","power":0}]},{"name":"ドドゲザン","types":["あく","はがね"],"base_stats":{"h":100,"a":135,"b":120,"c":60,"d":85,"s":50},"ability":"そうだいしょう","item":"ラムのみ","role":"ゆうかん A振り / メタバ+剣舞","moves":[{"name":"メタルバースト","type":"はがね","category":"物理","power":0},{"name":"ドゲザン","type":"あく","category":"物理","power":85},{"name":"ふいうち","type":"あく","category":"物理","power":70},{"name":"つるぎのまい","type":"ノーマル","category":"変化","power":0}]},{"name":"マフォクシー","types":["ほのお","エスパー"],"base_stats":{"h":75,"a":69,"b":72,"c":114,"d":100,"s":104},"ability":"もうか","item":"マフォクシナイト","role":"メガ特殊アタッカー","moves":[{"name":"かえんほうしゃ","type":"ほのお","category":"特殊","power":90},{"name":"サイコキネシス","type":"エスパー","category":"特殊","power":90},{"name":"くさむすび","type":"くさ","category":"特殊","power":0},{"name":"アンコール","type":"ノーマル","category":"変化","power":0}]},{"name":"リザードン","types":["ほのお","ひこう"],"base_stats":{"h":78,"a":84,"b":78,"c":109,"d":85,"s":100},"ability":"サンパワー","item":"リザードナイトX","role":"メガX物理スイーパー / ニトチャ+剣舞","moves":[{"name":"ニトロチャージ","type":"ほのお","category":"物理","power":50},{"name":"ドラゴンクロー","type":"ドラゴン","category":"物理","power":80},{"name":"かみなりパンチ","type":"でんき","category":"物理","power":75},{"name":"つるぎのまい","type":"ノーマル","category":"変化","power":0}]}],"coverage":[],"defense_matrix":[],"matchup_plans":[{"opponent":"Pattern A 環境標準","opponent_type":"リザY/アーマー/ゲン/カバ/ドド/ギル","leads":["ガブリアス","ブリジュラス","マフォクシー"],"backs":[],"reason":"Nash value +0.036 (Team1は+0.106)。80.1%この選出+15.1%ブリ/アシ/リザX。Mマフォ主軸、ブリ10万とガブステロで削る。MリザXはほぼ腐る。"},{"opponent":"Pattern B 高速アタッカー","opponent_type":"リザY/ゲン/マスカ/ミミロ/サザン/ロトム","leads":["ガブリアス","ブリジュラス","アシレーヌ"],"backs":[],"reason":"Nash value +1.0 (完全勝利)。Team1と同じ選出で完封。メガ腐り。"},{"opponent":"Pattern C 受け回し","opponent_type":"アーマー/カバ/キラフロ/ロトム/ブラッキー/ギル","leads":["ブリジュラス","アシレーヌ","ドドゲザン"],"backs":[],"reason":"Nash value +0.059 (Team1+0.090より劣)。ドドゲザンメタバ+剣舞で粘る、ブリはどうだんで崩し。"},{"opponent":"Pattern D 対マフォクシー特化","opponent_type":"ドド/ギル/ミミ/サザン/ブラッキー/キラフロ","leads":["ガブリアス","アシレーヌ","ドドゲザン"],"backs":[],"reason":"Nash value +0.183 (Team1とほぼ同等)。マフォ/リザX腐る。ガブじしん+アシムンフォ+ドドゲつるまい積みで対応。"},{"opponent":"Pattern E 実相手1 (Mリザ+ブリ+スカガブ)","opponent_type":"MリザX/ブリ/スカガブ/マスカ/アシ/Mハッサム","leads":["ガブリアス","アシレーヌ","ドドゲザン"],"backs":[],"reason":"Nash value -0.247 (大不利/Team1+0.001から崩壊)。Mハッサム不在で相手Mハッサムミラー優位消失、カイリュー不在で先制処理不能。"},{"opponent":"Pattern F 実相手2 (ガルーラ軸)","opponent_type":"Mガルーラ/アーマー/ロトムW/タスキガブ/ミミ/黒眼鏡ドド","leads":["ガブリアス","アシレーヌ","ドドゲザン"],"backs":[],"reason":"Nash value -0.104 (Team1-0.050よりさらに劣)。Mガルーラおやこあい+ふいうちでエース崩壊、カイリューしんそく不在が致命的。"},{"opponent":"Pattern G 実相手3 (Mリザ+Mゲンガー)","opponent_type":"アーマー/キラフロル/スカガブ/ミミ/Mゲンガー/MリザY","leads":["ガブリアス","アシレーヌ","ドドゲザン"],"backs":[],"reason":"Nash value -0.154 (大不利/Team1+0.117から崩壊)。Mハッサムバレパン2×(Mゲンガー)/4×(MリザY)の決定打消失。"},{"opponent":"Pattern H 実相手4 (Mリザ+Mルカリオ+カバ軸)","opponent_type":"MリザY/Mルカリオ/カバ/ロトムW/スカガブ/ミミ","leads":["アシレーヌ","ドドゲザン","マフォクシー"],"backs":[],"reason":"Nash value +0.035 (Team1+0.171より劣)。64%この選出+36%ガブ/ブリ/アシ。Mマフォ対Mルカリオ用、カイリューしんそく代わりにドドゲふいうち。"}],"strengths":["メガ2枠 (Mマフォクシー + MリザードンX) でメガ腐り率を下げる構造 - 理論上のメリット","ドドゲザン メタルバースト型でカウンター + 剣舞積み性能","Mマフォクシー (特殊軸) と MリザードンX (物理軸) の両刀メガでタイプ幅広","ブリジュラス C振り調整でC 176 → 特殊火力アップ (対アーマー/ロトム 効率改善)","アシレーヌ B特化 (Def138/A↓) で物理受け性能向上 - スカガブどくづき 0.5× 耐え","Pattern B 完全勝利 (+1.0)、Pattern D 互角 (+0.183) は Team1 と同等"],"weaknesses":["【総合】Nash 平均勝率 +0.101 (Team1+0.202 より -0.101 劣化) → 全環境で Team1 に劣る","【致命】カイリュー 不在でしんそく先制技消失 - マスカーニャ/ミミッキュ/ガルーラ等の高速物理を止められない","【致命】Mハッサム 不在でバレパン先制消失 - 対MリザY(4×)/Mゲンガー(2×)の決定打喪失 → Pattern E/G が崩壊","【Pattern E 実相手1】value -0.247 で大不利 - 相手Mハッサムミラーの優位も失う","【Pattern G 実相手3】value -0.154 で大不利 - 相手Mゲンガー/MリザY処理不能","【Pattern H】value +0.035 (Team1 +0.171) - Mルカリオ急襲への先制手段欠如","【Mリザ X 腐り】Nash 選出は Pattern A の 15% のみ - スカガブ/Mルカリオに先手取られ起動困難","【ドドゲザン依存】Pattern C-G で 100% 選出だがそうだいしょう発動前は火力不足 + 低速 S63で後手"],"updated_at":""}
+{
+  "battle_format": "singles",
+  "mechanics": "メガシンカ",
+  "version": "champions",
+  "regulation": "M-A",
+  "phase": 8,
+  "members": [
+    {
+      "name": "ガブリアス",
+      "types": [
+        "ドラゴン",
+        "じめん"
+      ],
+      "base_stats": {
+        "h": 108,
+        "a": 130,
+        "b": 95,
+        "c": 80,
+        "d": 85,
+        "s": 102
+      },
+      "ability": "さめはだ",
+      "item": "きあいのタスキ",
+      "role": "物理エース / ステロ展開",
+      "moves": [
+        {
+          "name": "じしん",
+          "type": "じめん",
+          "category": "物理",
+          "power": 100,
+          "accuracy": 100
+        },
+        {
+          "name": "げきりん",
+          "type": "ドラゴン",
+          "category": "物理",
+          "power": 120,
+          "accuracy": 100
+        },
+        {
+          "name": "がんせきふうじ",
+          "type": "いわ",
+          "category": "物理",
+          "power": 60,
+          "accuracy": 95
+        },
+        {
+          "name": "ステルスロック",
+          "type": "いわ",
+          "category": "変化",
+          "power": 0,
+          "accuracy": 0
+        }
+      ],
+      "nature": "ようき",
+      "stat_points": {
+        "h": 2,
+        "a": 32,
+        "b": 0,
+        "c": 0,
+        "d": 0,
+        "s": 32
+      },
+      "actual_stats": {
+        "h": 185,
+        "a": 182,
+        "b": 115,
+        "c": 90,
+        "d": 105,
+        "s": 169
+      },
+      "ivs": null
+    },
+    {
+      "name": "ブリジュラス",
+      "types": [
+        "はがね",
+        "ドラゴン"
+      ],
+      "base_stats": {
+        "h": 90,
+        "a": 105,
+        "b": 130,
+        "c": 125,
+        "d": 65,
+        "s": 85
+      },
+      "ability": "じきゅうりょく",
+      "item": "たべのこし",
+      "role": "特殊アタッカー (C振り調整)",
+      "moves": [
+        {
+          "name": "りゅうせいぐん",
+          "type": "ドラゴン",
+          "category": "特殊",
+          "power": 130,
+          "accuracy": 90
+        },
+        {
+          "name": "ラスターカノン",
+          "type": "はがね",
+          "category": "特殊",
+          "power": 80,
+          "accuracy": 100
+        },
+        {
+          "name": "10まんボルト",
+          "type": "でんき",
+          "category": "特殊",
+          "power": 90,
+          "accuracy": 100
+        },
+        {
+          "name": "はどうだん",
+          "type": "かくとう",
+          "category": "特殊",
+          "power": 80,
+          "accuracy": 0
+        }
+      ],
+      "nature": "ひかえめ",
+      "stat_points": {
+        "h": 32,
+        "a": 0,
+        "b": 0,
+        "c": 15,
+        "d": 16,
+        "s": 3
+      },
+      "actual_stats": {
+        "h": 197,
+        "a": 112,
+        "b": 150,
+        "c": 176,
+        "d": 101,
+        "s": 108
+      },
+      "ivs": null
+    },
+    {
+      "name": "アシレーヌ",
+      "types": [
+        "みず",
+        "フェアリー"
+      ],
+      "base_stats": {
+        "h": 80,
+        "a": 74,
+        "b": 74,
+        "c": 126,
+        "d": 116,
+        "s": 60
+      },
+      "ability": "げきりゅう",
+      "item": "オボンのみ",
+      "role": "物理受け / みがめいそう積み (B特化)",
+      "moves": [
+        {
+          "name": "ムーンフォース",
+          "type": "フェアリー",
+          "category": "特殊",
+          "power": 95,
+          "accuracy": 100
+        },
+        {
+          "name": "うたかたのアリア",
+          "type": "みず",
+          "category": "特殊",
+          "power": 90,
+          "accuracy": 100
+        },
+        {
+          "name": "みがわり",
+          "type": "ノーマル",
+          "category": "変化",
+          "power": 0,
+          "accuracy": 0
+        },
+        {
+          "name": "めいそう",
+          "type": "エスパー",
+          "category": "変化",
+          "power": 0,
+          "accuracy": 0
+        }
+      ],
+      "nature": "ずぶとい",
+      "stat_points": {
+        "h": 25,
+        "a": 0,
+        "b": 32,
+        "c": 0,
+        "d": 2,
+        "s": 7
+      },
+      "actual_stats": {
+        "h": 180,
+        "a": 84,
+        "b": 138,
+        "c": 146,
+        "d": 138,
+        "s": 87
+      },
+      "ivs": null
+    },
+    {
+      "name": "ドドゲザン",
+      "types": [
+        "あく",
+        "はがね"
+      ],
+      "base_stats": {
+        "h": 100,
+        "a": 135,
+        "b": 120,
+        "c": 60,
+        "d": 85,
+        "s": 50
+      },
+      "ability": "そうだいしょう",
+      "item": "ラムのみ",
+      "role": "ゆうかん A振り / メタバ+剣舞",
+      "moves": [
+        {
+          "name": "メタルバースト",
+          "type": "はがね",
+          "category": "物理",
+          "power": 0,
+          "accuracy": 100
+        },
+        {
+          "name": "ドゲザン",
+          "type": "あく",
+          "category": "物理",
+          "power": 85,
+          "accuracy": 0
+        },
+        {
+          "name": "ふいうち",
+          "type": "あく",
+          "category": "物理",
+          "power": 70,
+          "accuracy": 100
+        },
+        {
+          "name": "つるぎのまい",
+          "type": "ノーマル",
+          "category": "変化",
+          "power": 0,
+          "accuracy": 0
+        }
+      ],
+      "nature": "ゆうかん",
+      "stat_points": {
+        "h": 32,
+        "a": 32,
+        "b": 0,
+        "c": 0,
+        "d": 2,
+        "s": 0
+      },
+      "actual_stats": {
+        "h": 207,
+        "a": 205,
+        "b": 140,
+        "c": 80,
+        "d": 107,
+        "s": 63
+      },
+      "ivs": null
+    },
+    {
+      "name": "マフォクシー",
+      "types": [
+        "ほのお",
+        "エスパー"
+      ],
+      "base_stats": {
+        "h": 75,
+        "a": 69,
+        "b": 72,
+        "c": 114,
+        "d": 100,
+        "s": 104
+      },
+      "ability": "もうか",
+      "item": "マフォクシナイト",
+      "role": "メガ特殊アタッカー",
+      "moves": [
+        {
+          "name": "かえんほうしゃ",
+          "type": "ほのお",
+          "category": "特殊",
+          "power": 90,
+          "accuracy": 100
+        },
+        {
+          "name": "サイコキネシス",
+          "type": "エスパー",
+          "category": "特殊",
+          "power": 90,
+          "accuracy": 100
+        },
+        {
+          "name": "くさむすび",
+          "type": "くさ",
+          "category": "特殊",
+          "power": 0,
+          "accuracy": 100
+        },
+        {
+          "name": "アンコール",
+          "type": "ノーマル",
+          "category": "変化",
+          "power": 0,
+          "accuracy": 100
+        }
+      ],
+      "nature": "おくびょう",
+      "stat_points": {
+        "h": 1,
+        "a": 0,
+        "b": 1,
+        "c": 32,
+        "d": 0,
+        "s": 32
+      },
+      "actual_stats": {
+        "h": 151,
+        "a": 80,
+        "b": 93,
+        "c": 166,
+        "d": 120,
+        "s": 171
+      },
+      "ivs": null
+    },
+    {
+      "name": "リザードン",
+      "types": [
+        "ほのお",
+        "ひこう"
+      ],
+      "base_stats": {
+        "h": 78,
+        "a": 84,
+        "b": 78,
+        "c": 109,
+        "d": 85,
+        "s": 100
+      },
+      "ability": "サンパワー",
+      "item": "リザードナイトX",
+      "role": "メガX物理スイーパー / ニトチャ+剣舞",
+      "moves": [
+        {
+          "name": "ニトロチャージ",
+          "type": "ほのお",
+          "category": "物理",
+          "power": 50,
+          "accuracy": 100
+        },
+        {
+          "name": "ドラゴンクロー",
+          "type": "ドラゴン",
+          "category": "物理",
+          "power": 80,
+          "accuracy": 100
+        },
+        {
+          "name": "かみなりパンチ",
+          "type": "でんき",
+          "category": "物理",
+          "power": 75,
+          "accuracy": 100
+        },
+        {
+          "name": "つるぎのまい",
+          "type": "ノーマル",
+          "category": "変化",
+          "power": 0,
+          "accuracy": 0
+        }
+      ],
+      "nature": "いじっぱり",
+      "stat_points": {
+        "h": 2,
+        "a": 32,
+        "b": 0,
+        "c": 0,
+        "d": 0,
+        "s": 32
+      },
+      "actual_stats": {
+        "h": 155,
+        "a": 149,
+        "b": 98,
+        "c": 116,
+        "d": 105,
+        "s": 152
+      },
+      "ivs": null
+    }
+  ],
+  "coverage": [],
+  "defense_matrix": [],
+  "matchup_plans": [
+    {
+      "opponent": "Pattern A 環境標準",
+      "opponent_type": "リザY/アーマー/ゲン/カバ/ドド/ギル",
+      "leads": [
+        "ガブリアス",
+        "ブリジュラス",
+        "マフォクシー"
+      ],
+      "backs": [],
+      "reason": "Nash value +0.036 (Team1は+0.106)。80.1%この選出+15.1%ブリ/アシ/リザX。Mマフォ主軸、ブリ10万とガブステロで削る。MリザXはほぼ腐る。"
+    },
+    {
+      "opponent": "Pattern B 高速アタッカー",
+      "opponent_type": "リザY/ゲン/マスカ/ミミロ/サザン/ロトム",
+      "leads": [
+        "ガブリアス",
+        "ブリジュラス",
+        "アシレーヌ"
+      ],
+      "backs": [],
+      "reason": "Nash value +1.0 (完全勝利)。Team1と同じ選出で完封。メガ腐り。"
+    },
+    {
+      "opponent": "Pattern C 受け回し",
+      "opponent_type": "アーマー/カバ/キラフロ/ロトム/ブラッキー/ギル",
+      "leads": [
+        "ブリジュラス",
+        "アシレーヌ",
+        "ドドゲザン"
+      ],
+      "backs": [],
+      "reason": "Nash value +0.059 (Team1+0.090より劣)。ドドゲザンメタバ+剣舞で粘る、ブリはどうだんで崩し。"
+    },
+    {
+      "opponent": "Pattern D 対マフォクシー特化",
+      "opponent_type": "ドド/ギル/ミミ/サザン/ブラッキー/キラフロ",
+      "leads": [
+        "ガブリアス",
+        "アシレーヌ",
+        "ドドゲザン"
+      ],
+      "backs": [],
+      "reason": "Nash value +0.183 (Team1とほぼ同等)。マフォ/リザX腐る。ガブじしん+アシムンフォ+ドドゲつるまい積みで対応。"
+    },
+    {
+      "opponent": "Pattern E 実相手1 (Mリザ+ブリ+スカガブ)",
+      "opponent_type": "MリザX/ブリ/スカガブ/マスカ/アシ/Mハッサム",
+      "leads": [
+        "ガブリアス",
+        "アシレーヌ",
+        "ドドゲザン"
+      ],
+      "backs": [],
+      "reason": "Nash value -0.247 (大不利/Team1+0.001から崩壊)。Mハッサム不在で相手Mハッサムミラー優位消失、カイリュー不在で先制処理不能。"
+    },
+    {
+      "opponent": "Pattern F 実相手2 (ガルーラ軸)",
+      "opponent_type": "Mガルーラ/アーマー/ロトムW/タスキガブ/ミミ/黒眼鏡ドド",
+      "leads": [
+        "ガブリアス",
+        "アシレーヌ",
+        "ドドゲザン"
+      ],
+      "backs": [],
+      "reason": "Nash value -0.104 (Team1-0.050よりさらに劣)。Mガルーラおやこあい+ふいうちでエース崩壊、カイリューしんそく不在が致命的。"
+    },
+    {
+      "opponent": "Pattern G 実相手3 (Mリザ+Mゲンガー)",
+      "opponent_type": "アーマー/キラフロル/スカガブ/ミミ/Mゲンガー/MリザY",
+      "leads": [
+        "ガブリアス",
+        "アシレーヌ",
+        "ドドゲザン"
+      ],
+      "backs": [],
+      "reason": "Nash value -0.154 (大不利/Team1+0.117から崩壊)。Mハッサムバレパン2×(Mゲンガー)/4×(MリザY)の決定打消失。"
+    },
+    {
+      "opponent": "Pattern H 実相手4 (Mリザ+Mルカリオ+カバ軸)",
+      "opponent_type": "MリザY/Mルカリオ/カバ/ロトムW/スカガブ/ミミ",
+      "leads": [
+        "アシレーヌ",
+        "ドドゲザン",
+        "マフォクシー"
+      ],
+      "backs": [],
+      "reason": "Nash value +0.035 (Team1+0.171より劣)。64%この選出+36%ガブ/ブリ/アシ。Mマフォ対Mルカリオ用、カイリューしんそく代わりにドドゲふいうち。"
+    }
+  ],
+  "strengths": [
+    "メガ2枠 (Mマフォクシー + MリザードンX) でメガ腐り率を下げる構造 - 理論上のメリット",
+    "ドドゲザン メタルバースト型でカウンター + 剣舞積み性能",
+    "Mマフォクシー (特殊軸) と MリザードンX (物理軸) の両刀メガでタイプ幅広",
+    "ブリジュラス C振り調整でC 176 → 特殊火力アップ (対アーマー/ロトム 効率改善)",
+    "アシレーヌ B特化 (Def138/A↓) で物理受け性能向上 - スカガブどくづき 0.5× 耐え",
+    "Pattern B 完全勝利 (+1.0)、Pattern D 互角 (+0.183) は Team1 と同等"
+  ],
+  "weaknesses": [
+    "【総合】Nash 平均勝率 +0.101 (Team1+0.202 より -0.101 劣化) → 全環境で Team1 に劣る",
+    "【致命】カイリュー 不在でしんそく先制技消失 - マスカーニャ/ミミッキュ/ガルーラ等の高速物理を止められない",
+    "【致命】Mハッサム 不在でバレパン先制消失 - 対MリザY(4×)/Mゲンガー(2×)の決定打喪失 → Pattern E/G が崩壊",
+    "【Pattern E 実相手1】value -0.247 で大不利 - 相手Mハッサムミラーの優位も失う",
+    "【Pattern G 実相手3】value -0.154 で大不利 - 相手Mゲンガー/MリザY処理不能",
+    "【Pattern H】value +0.035 (Team1 +0.171) - Mルカリオ急襲への先制手段欠如",
+    "【Mリザ X 腐り】Nash 選出は Pattern A の 15% のみ - スカガブ/Mルカリオに先手取られ起動困難",
+    "【ドドゲザン依存】Pattern C-G で 100% 選出だがそうだいしょう発動前は火力不足 + 低速 S63で後手"
+  ],
+  "updated_at": ""
+}
