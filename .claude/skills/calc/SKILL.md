@@ -72,7 +72,7 @@ $PKDX query "<ポケモン名>" --version "<version>" --format json
    - 合成された一意名: `キュウコン（アローラ）` / `ランドロス（れいじゅう）` / `ガーディ（ヒスイ）` / `バクフーン（ヒスイ）` 等
    - 英語名: `Wash Rotom` / `Ninetales (Alolan)` 等
 2. **見つからない場合** (`Error: Pokemon not found`) は原種名で再 query し、返り値の `forms[]` を確認:
-   - `forms[]` はその version に実在するフォームの一意名配列 (原種引き時のみ列挙、フォーム直引き時は空)
+   - `forms[]` はその version に実在するフォームの一意名配列。原種引き時のみ列挙され、フォーム直引き時や形態無しの場合は **JSON キーごと省略** される
    - 例: `pkdx query ロトム --version champions` → `"forms":["ヒートロトム","ウォッシュロトム","フロストロトム","スピンロトム","カットロトム"]`
    - 例: `pkdx query キュウコン --version scarlet_violet` → `"forms":["キュウコン（アローラ）"]`
 3. ユーザーの言及と意味的に合う一意名を選び、その名前で再度 query して該当フォームの `type1`/`type2`/`ability1`/`ability2`/`dream_ability` を取得する

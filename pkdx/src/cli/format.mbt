@@ -42,13 +42,16 @@ fn pokemon_to_json(p : @model.Pokemon) -> String {
   a2 +
   ",\"dream_ability\":" +
   da +
-  ",\"forms\":" +
-  forms_to_json(p.forms) +
+  (if p.forms.length() > 0 {
+    ",\"forms\":" + forms_to_json(p.forms)
+  } else {
+    ""
+  }) +
   "}"
 }
 
 ///|
-/// forms[] を JSON 配列文字列に変換する。空配列は "[]"。
+/// forms[] を JSON 配列文字列に変換する。呼び出し側で空配列判定済み。
 fn forms_to_json(forms : Array[String]) -> String {
   let mut s = "["
   for i = 0; i < forms.length(); i = i + 1 {
