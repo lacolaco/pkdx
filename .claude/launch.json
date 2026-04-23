@@ -1,0 +1,13 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "site",
+      "runtimeExecutable": "bun",
+      "runtimeArgs": ["run", "dev"],
+      "cwd": "${workspaceFolder}/site",
+      "port": 4321,
+      "url": "http://localhost:4321/pkdx/"
+    }
+  ]
+}

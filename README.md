@@ -11,6 +11,7 @@ Claude Code / Codex と対話しながらチームを組んだり、ポケモン
 - **耐久指数最適化**: H/B/D の努力値配分を最適化。HP条件（きのみ/オボン/たべのこし）・物理/特殊比重・top-N 候補の指定に対応し、「HBD 値が最大になる配分」を提示する
 - **ポケモン検索**: 名前・タイプ・素早さ・覚えるわざなどの条件でポケモンを検索。技一覧やタイプ相性もすぐ引ける
 - **バトルシミュレーション**: 登録済みのチーム2つを使って、選出から対戦結果までをシミュレーション。最適行動を取り続けた際の勝率を導出
+- **構築記事・ブログ管理**: 登録したバトルチームデータを元に、構築ブログを公開できる。構築に紐づかないブログの作成も可能
 
 ## 対応バージョン
 
@@ -58,10 +59,77 @@ Claude Code / Codex (CLI / デスクトップアプリどちらでも可) をこ
 
 # 対戦シミュレーションをはじめる
 > /nash
+
+# ブログの管理をはじめる
+> /blog
 ```
 
 作成したチーム・型は `./box` 配下に置かれる。手動で編集もできるし、Claude Code / Codex経由で閲覧・編集も可能。
 
+### 構築をブログとして公開する（GitHub Pages）
+
+GitHub にフォークしていれば、作成した構築記事とブログ記事を GitHub Pages に自動デプロイできる。
+
+#### セットアップ (1 回だけ)
+
+1. リポジトリの Settings → Pages → Source を **"GitHub Actions"** に切り替える
+2. `main` に push すると、`.github/workflows/deploy-pages.yml` が自動で Astro サイトをビルドして公開する (URL は Actions ログに表示される)
+3. 初回だけ手動でテストしたい場合は Actions タブから `Deploy Pages` → `Run workflow` をクリック
+
+#### team-build → ブログ公開のデータフロー
+
+```mermaid
+flowchart LR
+    subgraph Local["ローカル (fork clone)"]
+        direction TB
+        U["ユーザー"]:::user
+        CC["Claude Code / Codex"]:::tool
+        TB["/team-builder<br/>skill"]:::skill
+        CA["/calc<br/>skill"]:::skill
+        PKDX["bin/pkdx<br/>(MoonBit CLI)"]:::cli
+        CACHE[("box/cache/<br/>team_cache_*.json")]:::store
+        TEAMS[("box/teams/<br/>&lt;slug&gt;.md<br/>&lt;slug&gt;.meta.json")]:::store
+        BLOG[("box/blog/<br/>*.md")]:::store
+    end
+    subgraph GitHub["GitHub (fork)"]
+        direction TB
+        GIT[("main branch")]:::store
+        WF["deploy-pages.yml<br/>(Astro build)"]:::ci
+        PAGES[("GitHub Pages<br/>&lt;user&gt;.github.io/pkdx/")]:::pub
+    end
+
+    U -- "対話" --> CC
+    CC -- "Phase 0-8" --> TB
+    TB -- "pkdx query/search<br/>pkdx hbd 等" --> PKDX
+    TB -- "書き込み" --> CACHE
+    CACHE -- "cat | pkdx write teams<br/>(+ frontmatter)" --> PKDX
+    PKDX -- "生成" --> TEAMS
+    CC -- "ダメ計" --> CA
+    CA -- "pkdx damage<br/>--attach-team" --> PKDX
+    PKDX -- "damage_calcs[] 追記" --> TEAMS
+    U -- "手編集<br/>(edited: true)" --> TEAMS
+    U -- "自由記事" --> BLOG
+    TEAMS -- "git push" --> GIT
+    BLOG -- "git push" --> GIT
+    GIT -- "自動ビルド" --> WF
+    WF -- "site/dist デプロイ" --> PAGES
+
+    classDef user fill:#fef3c7,stroke:#b45309,color:#111
+    classDef tool fill:#e0e7ff,stroke:#4338ca,color:#111
+    classDef skill fill:#d1fae5,stroke:#047857,color:#111
+    classDef cli fill:#f3e8ff,stroke:#6d28d9,color:#111
+    classDef store fill:#f3f4f6,stroke:#4b5563,color:#111
+    classDef ci fill:#fee2e2,stroke:#b91c1c,color:#111
+    classDef pub fill:#cffafe,stroke:#0e7490,color:#111
+```
+
+#### 公開対象・編集ポリシー
+
+カスタムドメイン: `site/public/CNAME` にドメイン名 1 行のファイルを置くと有効化。
+
+公開を停止: Settings → Pages → Disable、または `box/site.config.json` の `enabled` を `false` にする。
+
+サイト本体 (`site/` 配下) は upstream 管理なので直接編集は非推奨。カスタマイズは `box/site.config.json` と `site/public/` 経由で行う。
 
 ### CLI 単体でも使える
 
