@@ -25,6 +25,7 @@ fn mk_pokemon(
     ability2: "",
     dream_ability: "",
     weight: 0.0,
+    forms: [],
   }
 }
 
@@ -57,6 +58,7 @@ fn mk_pokemon_typed(
     ability2: "",
     dream_ability: "",
     weight: 0.0,
+    forms: [],
   }
 }
 

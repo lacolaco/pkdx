@@ -226,6 +226,7 @@ fn parse_combatant_json(
         ability2: "",
         dream_ability: "",
         weight: 0.0,
+        forms: [],
       }
       let moves : Array[@model.Move] = match m.get("moves") {
         Some(Array(arr)) => {
@@ -334,6 +335,7 @@ fn mk_empty_combatant() -> Combatant {
       ability2: "",
       dream_ability: "",
       weight: 0.0,
+      forms: [],
     },
     moves: [],
     ability: "",

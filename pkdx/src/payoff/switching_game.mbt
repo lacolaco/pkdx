@@ -197,6 +197,7 @@ fn effective_combatant(c : Combatant, is_mega : Bool) -> Combatant {
         ability2: "",
         dream_ability: "",
         weight: base.weight,
+        forms: [],
       }
       {
         pokemon: effective_pokemon,
