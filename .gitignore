@@ -8,4 +8,31 @@ box/cache/damage_cache.sqlite-shm
 
 # version管理対象外のスキル出力
 box/**/__no_save.*
-*.meta.json.bak
+*.meta.json.bak*
+
+# session-local 作業ディレクトリ (hydrate cache / page text / debug JSON 等)
+tmp/
+
+# Claude Code が切る git worktree のチェックアウト先
+.claude/worktrees/
+
+# scheduled-task の排他 lock
+.claude/scheduled_tasks.lock
+
+# Claude Code per-user permissions
+.claude/settings.local.json
+
+# session-handover skill の handover doc
+task.local.md
+
+# fork-only skill (yakkun-scan / opponent-insight / ranking) 出力
+box/opponents/
+box/insights/
+box/ranking/
+
+# Python bytecode cache
+__pycache__/
+*.pyc
+
+# repo-root cache dir (yakkun-scan page fetch cache 等)
+.cache/
