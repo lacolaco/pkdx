@@ -20,5 +20,5 @@
 
 ## 関連スキル
 
-- `.claude/skills/yakkun-fetch/` — 参考チーム取り込み (本制約を事前参照)
+- `.claude/skills/yakkun-scan/` — yakkun 構築一覧の日次巡回・仮想敵プール蓄積 (本制約を事前参照)
 - `.claude/skills/yakkun-ranking/` — 使用率ランキング
