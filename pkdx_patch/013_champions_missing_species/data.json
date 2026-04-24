@@ -1,0 +1,23 @@
+[
+  {
+    "id": "1013_00000000_0_000_0",
+    "no": "1013",
+    "globalNo": "1013",
+    "form": "",
+    "region": "",
+    "mega_evolution": "",
+    "gigantamax": "",
+    "pokedex": "チャンピオンズ",
+    "type1": "くさ",
+    "type2": "ゴースト",
+    "hp": 71,
+    "attack": 60,
+    "defense": 106,
+    "special_attack": 121,
+    "special_defense": 80,
+    "speed": 70,
+    "ability1": "おもてなし",
+    "ability2": "",
+    "dream_ability": "たいねつ"
+  }
+]
