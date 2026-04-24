@@ -5,8 +5,15 @@ pub fn query_pokemon(
   name : String,
   version : String,
 ) -> Result[@model.Pokemon, String] {
+  // pokedex_name には base 行に加えて、011_form_name_aliases migration で
+  // フォーム別の一意な別名 (ウォッシュロトム / キュウコン（アローラ） 等) が
+  // 入っている。alias 行は form / region が非空なので、ここでは form / region
+  // による絞り込みはしない (絞ると alias に hit できない)。pne 自己結合は
+  // form / region / mega_evolution が一致する jpn/eng ペアを取るよう条件を
+  // 追加する。
   let sql =
     #|SELECT
+    #|  pn.id,
     #|  pn.globalNo,
     #|  pn.name AS name_ja,
     #|  pne.name AS name_en,
@@ -17,6 +24,8 @@ pub fn query_pokemon(
     #|  p.weight
     #|FROM pokedex_name pn
     #|JOIN pokedex_name pne ON pn.id = pne.id
+    #|  AND COALESCE(pne.form, '')           = COALESCE(pn.form, '')
+    #|  AND COALESCE(pne.region, '')         = COALESCE(pn.region, '')
     #|  AND COALESCE(pne.mega_evolution, '') = COALESCE(pn.mega_evolution, '')
     #|  AND pne.language = 'eng'
     #|JOIN local_pokedex_type t ON pn.id = t.id
@@ -29,12 +38,8 @@ pub fn query_pokemon(
     #|  AND COALESCE(a.mega_evolution, '') = COALESCE(pn.mega_evolution, '')
     #|  AND a.version = ?
     #|JOIN pokedex p ON pn.id = p.id
-    #|WHERE COALESCE(pn.form, '') = ''
-    #|  AND COALESCE(pn.region, '') = ''
-    #|  AND (
-    #|    (pn.language = 'jpn' AND pn.name = ?)
-    #|    OR (pn.language = 'eng' AND LOWER(pn.name) = LOWER(?))
-    #|  )
+    #|WHERE (pn.language = 'jpn' AND pn.name = ?)
+    #|   OR (pn.language = 'eng' AND LOWER(pn.name) = LOWER(?))
     #|LIMIT 1
   let rows = match query(db, sql, [version, version, version, name, name]) {
     Ok(r) => r
@@ -44,24 +49,83 @@ pub fn query_pokemon(
     return Err("Pokemon not found: " + name)
   }
   let r = rows[0]
+  let id = r[0]
+  let global_no = r[1]
+  // 原種 (base id) を引いた時だけ forms[] を埋める (discoverability)。
+  // 該当 version に実在するフォームだけに絞るため local_pokedex_status を JOIN。
+  let forms : Array[String] = if is_base_id(id) {
+    query_forms(db, global_no, id, version)
+  } else {
+    []
+  }
   Ok(@model.Pokemon::{
-    global_no: r[0],
-    name_ja: r[1],
-    name_en: r[2],
-    type1: r[3],
-    type2: r[4],
-    hp: parse_int(r[5]),
-    atk: parse_int(r[6]),
-    def_: parse_int(r[7]),
-    spa: parse_int(r[8]),
-    spd: parse_int(r[9]),
-    spe: parse_int(r[10]),
-    bst: parse_int(r[11]),
-    ability1: r[12],
-    ability2: r[13],
-    dream_ability: r[14],
-    weight: parse_double(r[15]),
+    global_no,
+    name_ja: r[2],
+    name_en: r[3],
+    type1: r[4],
+    type2: r[5],
+    hp: parse_int(r[6]),
+    atk: parse_int(r[7]),
+    def_: parse_int(r[8]),
+    spa: parse_int(r[9]),
+    spd: parse_int(r[10]),
+    spe: parse_int(r[11]),
+    bst: parse_int(r[12]),
+    ability1: r[13],
+    ability2: r[14],
+    dream_ability: r[15],
+    weight: parse_double(r[16]),
+    forms,
   })
+}
+
+///|
+/// base id (globalNo_00000000_0_000_0) かどうか。
+fn is_base_id(id : String) -> Bool {
+  let suffix = "_00000000_0_000_0"
+  if id.length() < suffix.length() {
+    return false
+  }
+  let start = id.length() - suffix.length()
+  for i = 0; i < suffix.length(); i = i + 1 {
+    if id[start + i] != suffix[i] {
+      return false
+    }
+  }
+  true
+}
+
+///|
+/// 指定 globalNo の、引いた id 以外で該当 version に存在するフォーム alias を返す。
+/// 011_form_name_aliases migration によって各 alias は語彙的に一意 (例:
+/// "ウォッシュロトム", "キュウコン（アローラ）") なのでそのまま `pkdx query` の
+/// 引数として使える。
+fn query_forms(
+  db : Db,
+  global_no : String,
+  self_id : String,
+  version : String,
+) -> Array[String] {
+  let sql =
+    #|SELECT DISTINCT pn.name
+    #|FROM pokedex_name pn
+    #|JOIN local_pokedex_status s ON pn.id = s.id
+    #|  AND COALESCE(s.mega_evolution, '') = COALESCE(pn.mega_evolution, '')
+    #|  AND s.version = ?
+    #|WHERE pn.globalNo = ?
+    #|  AND pn.language = 'jpn'
+    #|  AND pn.id != ?
+    #|ORDER BY pn.id
+  match query(db, sql, [version, global_no, self_id]) {
+    Ok(rows) => {
+      let out : Array[String] = []
+      for i = 0; i < rows.length(); i = i + 1 {
+        out.push(rows[i][0])
+      }
+      out
+    }
+    Err(_) => []
+  }
 }
 
 ///|

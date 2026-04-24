@@ -235,6 +235,19 @@ Phase 1-Team-Vision で vision 抽出 + `pkdx stat-reverse` 検証済みの SP /
 
 5. **計算実行 + attach**: 重要 — `pkdx damage` には `--atk-ev` / `--def-ev` オプションは存在しない。実数値は `--atk-stat` / `--def-stat` / `--def-hp` で直接渡す（pre-rank の生stat値）。実数値は **`pkdx stat-calc` の出力を SSoT** とし、手計算しない。
 
+   **rev2 フラグ (威力可変 / 壁 / 連続技 / 状態)**: 以下は該当する技 / 状況でのみ追加する。指定しなければ既定値 (威力素点・壁なし・状態なし・連続技=auto) でそのまま計算される。
+   - `--wall reflect|light-screen|aurora-veil` (または `リフレクター`/`ひかりのかべ`/`オーロラベール`) … 守り側の壁が場にある想定
+   - `--atk-status yakedo|mahi|doku|...` (または `やけど`/`まひ`/...) … からげんき の威力 2x 判定 (まひ/やけど/どく/もうどく で発動、ねむり/あくびは行動不能扱いで発動しない)
+   - `--def-status ...` … たたりめ の威力 2x 判定
+   - `--atk-rank-up-count N` … アシストパワー の威力 = 20 + 20N
+   - `--def-rank-up-count N` … つけあがる の威力 = 20 + 20N
+   - `--atk-hp 1/2` (または `50%`) … やけっぱち の HP 半分以下判定
+   - `--def-item-removable` … はたきおとす の 1.5x 判定 (奪える持ち物のときのみ)
+   - `--multi-hit 5` … Skill Link 技で 5 発固定 / `auto` は DB 参照 (ロックブラスト等 2-5 乱数は中央値 3)
+   - `--disguise-active` … ミミッキュの初撃 (ダメージ 0 + `disguise_blocked=true`)
+
+   damage_calcs ブログ埋め込みでは `hits_dealt` と `disguise_blocked` も meta.json に記録される。連続技は 1 発ぶんを element-wise で n 倍して 16 段テーブルに反映される。
+
    **共通: opponent の実数値計算** (両 format で必要):
 
    ```bash
@@ -398,6 +411,25 @@ AskUserQuestionで軸ポケモンを聞く:
 ```bash
 $PKDX query "<ポケモン名>" --version "<version>" --format json
 ```
+
+#### フォーム違いポケモンの扱い
+
+**手順**:
+
+1. ユーザー入力名をそのまま `pkdx query "<名前>" --version "<version>" --format json` に渡す。以下は直接引ける:
+   - 原種名に form 名を接頭/接尾した一意名: `ウォッシュロトム` / `ヒートロトム` / `メガガブリアス` / `メガリザードンX` 等
+   - 合成された一意名: `キュウコン（アローラ）` / `ランドロス（れいじゅう）` / `ガーディ（ヒスイ）` / `バクフーン（ヒスイ）` 等
+   - 英語名: `Wash Rotom` / `Ninetales (Alolan)` 等
+2. **見つからない場合** (`Error: Pokemon not found`) は原種名で再 query し、返り値の `forms[]` を確認:
+   - `forms[]` はその version に実在するフォームの一意名配列。原種引き時のみ列挙され、フォーム直引き時や形態無しの場合は **JSON キーごと省略** される
+   - 例: `pkdx query ロトム --version champions` → `"forms":["ヒートロトム","ウォッシュロトム","フロストロトム","スピンロトム","カットロトム"]`
+   - 例: `pkdx query キュウコン --version scarlet_violet` → `"forms":["キュウコン（アローラ）"]`
+3. ユーザー意図に合う一意名を選び、その名前で再度 query して該当フォームの `type1` / `type2` / `ability1` / `ability2` / `dream_ability` / 種族値を取得
+
+**注意点**:
+- 戦闘面で base と完全に同じフォーム (トリミアン毛型・ビビヨン模様・フラベベ花色・Unown 文字・マホイップ flavor 等) は `forms[]` に現れない。これらは原種として扱って問題ない
+- 該当 version にそのフォームが実在しない場合は `forms[]` からも除外される (例: Champions にはランドロス（れいじゅう）未収録)
+- メガシンカも form の一種として `forms[]` に含まれる (`メガガブリアス` 等)。メガ名で query するとメガ進化後の type/ability/stats が得られる
 
 **結果が空の場合**:
 
