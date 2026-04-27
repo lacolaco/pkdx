@@ -175,7 +175,22 @@ fn form_cosmetic(
   form_id : String,
   global_no : String,
 ) -> Result[Bool, String] {
-  let base_id = global_no + "_00000000_0_000_0"
+  compare_battle_data(db, form_id, global_no + "_00000000_0_000_0")
+}
+
+///|
+/// 任意の 2 つの id (`local_pokedex_*` の主キー) について status / type / ability
+/// が全 version で一致するなら true。 form_cosmetic / m012.forms_identical の
+/// 共通実装。
+///
+/// EXCEPT は非対称差なので、片側にしかない version 行があると「差あり」と判定
+/// される。 version 揃いのデータに対してのみ「全 version で同一なら一致」が
+/// 厳密に成り立つ。
+fn compare_battle_data(
+  db : @db.Db,
+  id_a : String,
+  id_b : String,
+) -> Result[Bool, String] {
   let stat_sql =
     #|SELECT COUNT(*) FROM (
     #|  SELECT version, hp, attack, defense, special_attack, special_defense, speed
@@ -184,10 +199,6 @@ fn form_cosmetic(
     #|  SELECT version, hp, attack, defense, special_attack, special_defense, speed
     #|    FROM local_pokedex_status WHERE id = ?
     #|)
-  match count_diff(db, stat_sql, form_id, base_id) {
-    Err(e) => return Err(e)
-    Ok(n) => if n > 0 { return Ok(false) }
-  }
   let type_sql =
     #|SELECT COUNT(*) FROM (
     #|  SELECT version, type1, COALESCE(type2, '')
@@ -196,10 +207,6 @@ fn form_cosmetic(
     #|  SELECT version, type1, COALESCE(type2, '')
     #|    FROM local_pokedex_type WHERE id = ?
     #|)
-  match count_diff(db, type_sql, form_id, base_id) {
-    Err(e) => return Err(e)
-    Ok(n) => if n > 0 { return Ok(false) }
-  }
   let ab_sql =
     #|SELECT COUNT(*) FROM (
     #|  SELECT version, COALESCE(ability1, ''), COALESCE(ability2, ''), COALESCE(dream_ability, '')
@@ -208,9 +215,11 @@ fn form_cosmetic(
     #|  SELECT version, COALESCE(ability1, ''), COALESCE(ability2, ''), COALESCE(dream_ability, '')
     #|    FROM local_pokedex_ability WHERE id = ?
     #|)
-  match count_diff(db, ab_sql, form_id, base_id) {
-    Err(e) => return Err(e)
-    Ok(n) => if n > 0 { return Ok(false) }
+  for sql in [stat_sql, type_sql, ab_sql] {
+    match count_diff(db, sql, id_a, id_b) {
+      Err(e) => return Err(e)
+      Ok(n) => if n > 0 { return Ok(false) }
+    }
   }
   Ok(true)
 }
@@ -229,23 +238,16 @@ fn count_diff(
         Ok(0)
       } else {
         match rows[0].get(0) {
-          Some(Some(s)) => Ok(parse_int_simple(s))
+          Some(Some(s)) => {
+            let n = try @strconv.parse_int(s) catch {
+              _ => 0
+            }
+            Ok(n)
+          }
           _ => Ok(0)
         }
       }
   }
-}
-
-///|
-fn parse_int_simple(s : String) -> Int {
-  let mut result = 0
-  for i = 0; i < s.length(); i = i + 1 {
-    let c = s[i].to_int()
-    if c >= 0x30 && c <= 0x39 {
-      result = result * 10 + (c - 0x30)
-    }
-  }
-  result
 }
 
 ///|

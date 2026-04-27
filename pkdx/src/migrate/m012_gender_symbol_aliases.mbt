@@ -69,7 +69,7 @@ pub fn run_012(db : @db.Db, _repo_root : String) -> Result[String, String] {
     }
     let male_id = gno + male_id_suffix
     let female_id = gno + female_id_suffix
-    let cosmetic = match forms_identical(db, male_id, female_id) {
+    let cosmetic = match compare_battle_data(db, male_id, female_id) {
       Err(e) => return Err(e)
       Ok(b) => b
     }
@@ -138,61 +138,6 @@ pub fn run_012(db : @db.Db, _repo_root : String) -> Result[String, String] {
     skipped_other.to_string() +
     " other",
   )
-}
-
-///|
-/// 011 の form_cosmetic と同条件 (status/type/ability の EXCEPT 比較で
-/// 全テーブル差ゼロなら true)。011 は (form_id, base_id) を比較するが、
-/// ここは (M_id, F_id) で同じ判定をする。両者は globalNo が同じなので
-/// EXCEPT は version 単位で行 vs 行の比較になる。
-///
-/// EXCEPT は非対称差なので、片側にしかない version 行があると「差あり」
-/// と判定される (= alias 投入対象になる)。011 と整合した意図的挙動で、
-/// version 揃いのデータに対してのみ「全 version で同一なら cosmetic」が
-/// 厳密に成り立つ。M_id にだけ追加 version 行があるエッジケースでは
-/// 過剰判定になるが、現状の対象 (Gen9 4 種) では発生しない。
-fn forms_identical(
-  db : @db.Db,
-  male_id : String,
-  female_id : String,
-) -> Result[Bool, String] {
-  let stat_sql =
-    #|SELECT COUNT(*) FROM (
-    #|  SELECT version, hp, attack, defense, special_attack, special_defense, speed
-    #|    FROM local_pokedex_status WHERE id = ?
-    #|  EXCEPT
-    #|  SELECT version, hp, attack, defense, special_attack, special_defense, speed
-    #|    FROM local_pokedex_status WHERE id = ?
-    #|)
-  match count_diff(db, stat_sql, male_id, female_id) {
-    Err(e) => return Err(e)
-    Ok(n) => if n > 0 { return Ok(false) }
-  }
-  let type_sql =
-    #|SELECT COUNT(*) FROM (
-    #|  SELECT version, type1, COALESCE(type2, '')
-    #|    FROM local_pokedex_type WHERE id = ?
-    #|  EXCEPT
-    #|  SELECT version, type1, COALESCE(type2, '')
-    #|    FROM local_pokedex_type WHERE id = ?
-    #|)
-  match count_diff(db, type_sql, male_id, female_id) {
-    Err(e) => return Err(e)
-    Ok(n) => if n > 0 { return Ok(false) }
-  }
-  let ab_sql =
-    #|SELECT COUNT(*) FROM (
-    #|  SELECT version, COALESCE(ability1, ''), COALESCE(ability2, ''), COALESCE(dream_ability, '')
-    #|    FROM local_pokedex_ability WHERE id = ?
-    #|  EXCEPT
-    #|  SELECT version, COALESCE(ability1, ''), COALESCE(ability2, ''), COALESCE(dream_ability, '')
-    #|    FROM local_pokedex_ability WHERE id = ?
-    #|)
-  match count_diff(db, ab_sql, male_id, female_id) {
-    Err(e) => return Err(e)
-    Ok(n) => if n > 0 { return Ok(false) }
-  }
-  Ok(true)
 }
 
 ///|
