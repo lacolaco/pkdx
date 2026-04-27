@@ -61,6 +61,7 @@ pub fn run_012(db : @db.Db, _repo_root : String) -> Result[String, String] {
   let mut inserted = 0
   let mut skipped_cosmetic = 0
   let mut skipped_no_base = 0
+  let mut skipped_other = 0
   for row in rows {
     let gno = match row.get(0) {
       Some(Some(s)) => s
@@ -100,6 +101,7 @@ pub fn run_012(db : @db.Db, _repo_root : String) -> Result[String, String] {
       }
       let alias = compose_alias(form_label, base_name, lang)
       if alias.length() == 0 || alias == base_name {
+        skipped_other = skipped_other + 1
         continue
       }
       let (form_col, region_col) = if lp_region.length() == 0 {
@@ -132,7 +134,9 @@ pub fn run_012(db : @db.Db, _repo_root : String) -> Result[String, String] {
     skipped_cosmetic.to_string() +
     " cosmetic, " +
     skipped_no_base.to_string() +
-    " no-base",
+    " no-base, " +
+    skipped_other.to_string() +
+    " other",
   )
 }
 
@@ -141,6 +145,12 @@ pub fn run_012(db : @db.Db, _repo_root : String) -> Result[String, String] {
 /// 全テーブル差ゼロなら true)。011 は (form_id, base_id) を比較するが、
 /// ここは (M_id, F_id) で同じ判定をする。両者は globalNo が同じなので
 /// EXCEPT は version 単位で行 vs 行の比較になる。
+///
+/// EXCEPT は非対称差なので、片側にしかない version 行があると「差あり」
+/// と判定される (= alias 投入対象になる)。011 と整合した意図的挙動で、
+/// version 揃いのデータに対してのみ「全 version で同一なら cosmetic」が
+/// 厳密に成り立つ。M_id にだけ追加 version 行があるエッジケースでは
+/// 過剰判定になるが、現状の対象 (Gen9 4 種) では発生しない。
 fn forms_identical(
   db : @db.Db,
   male_id : String,
@@ -154,7 +164,7 @@ fn forms_identical(
     #|  SELECT version, hp, attack, defense, special_attack, special_defense, speed
     #|    FROM local_pokedex_status WHERE id = ?
     #|)
-  match diff_count(db, stat_sql, male_id, female_id) {
+  match count_diff(db, stat_sql, male_id, female_id) {
     Err(e) => return Err(e)
     Ok(n) => if n > 0 { return Ok(false) }
   }
@@ -166,7 +176,7 @@ fn forms_identical(
     #|  SELECT version, type1, COALESCE(type2, '')
     #|    FROM local_pokedex_type WHERE id = ?
     #|)
-  match diff_count(db, type_sql, male_id, female_id) {
+  match count_diff(db, type_sql, male_id, female_id) {
     Err(e) => return Err(e)
     Ok(n) => if n > 0 { return Ok(false) }
   }
@@ -178,44 +188,11 @@ fn forms_identical(
     #|  SELECT version, COALESCE(ability1, ''), COALESCE(ability2, ''), COALESCE(dream_ability, '')
     #|    FROM local_pokedex_ability WHERE id = ?
     #|)
-  match diff_count(db, ab_sql, male_id, female_id) {
+  match count_diff(db, ab_sql, male_id, female_id) {
     Err(e) => return Err(e)
     Ok(n) => if n > 0 { return Ok(false) }
   }
   Ok(true)
-}
-
-///|
-fn diff_count(
-  db : @db.Db,
-  sql : String,
-  a : String,
-  b : String,
-) -> Result[Int, String] {
-  match @db.query_binds(db, sql, [@db.BindText(a), @db.BindText(b)]) {
-    Err(e) => Err(e)
-    Ok(rows) =>
-      if rows.length() == 0 {
-        Ok(0)
-      } else {
-        match rows[0].get(0) {
-          Some(Some(s)) => Ok(parse_count(s))
-          _ => Ok(0)
-        }
-      }
-  }
-}
-
-///|
-fn parse_count(s : String) -> Int {
-  let mut result = 0
-  for i = 0; i < s.length(); i = i + 1 {
-    let c = s[i].to_int()
-    if c >= 0x30 && c <= 0x39 {
-      result = result * 10 + (c - 0x30)
-    }
-  }
-  result
 }
 
 ///|
