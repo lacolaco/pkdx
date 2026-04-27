@@ -5,24 +5,35 @@ pub fn query_pokemon(
   name : String,
   version : String,
 ) -> Result[@model.Pokemon, String] {
-  // pokedex_name には base 行に加えて、011_form_name_aliases migration で
-  // フォーム別の一意な別名 (ウォッシュロトム / キュウコン（アローラ） 等) が
-  // 入っている。alias 行は form / region が非空なので、ここでは form / region
-  // による絞り込みはしない (絞ると alias に hit できない)。pne 自己結合は
-  // form / region / mega_evolution が一致する jpn/eng ペアを取るよう条件を
-  // 追加する。
+  // pokedex_name には base 行に加えて、011_form_name_aliases / 012_gender_symbol_aliases
+  // で生成されたフォーム/性別別名 (ウォッシュロトム / キュウコン（アローラ） /
+  // イダイトウ（オス） / Basculegion (Male) 等) が入っている。alias 行は
+  // form / region が非空 (012 は M base id を共有するが form='オスのすがた' で
+  // 区別される) なので、form / region による絞り込みは行わず WHERE で名前一致
+  // させる。
+  //
+  // pn は jpn/eng どちらの行にもマッチしうるため、name_ja は必ず jpn 行から
+  // 取れるよう pnj 自己結合を追加する。eng 引き (例: `Basculegion (Male)`) で
+  // も name_ja が日本語名 (`イダイトウ（オス）`) になることを保証する。
   let sql =
     #|SELECT
     #|  pn.id,
     #|  pn.globalNo,
-    #|  pn.name AS name_ja,
+    #|  pnj.name AS name_ja,
     #|  pne.name AS name_en,
     #|  t.type1, t.type2,
     #|  s.hp, s.attack, s.defense, s.special_attack, s.special_defense, s.speed,
     #|  (s.hp + s.attack + s.defense + s.special_attack + s.special_defense + s.speed) AS bst,
     #|  a.ability1, a.ability2, a.dream_ability,
-    #|  p.weight
+    #|  p.weight,
+    #|  COALESCE(pn.form, ''), COALESCE(pn.region, ''),
+    #|  COALESCE(pn.mega_evolution, ''), COALESCE(pn.gigantamax, '')
     #|FROM pokedex_name pn
+    #|JOIN pokedex_name pnj ON pn.id = pnj.id
+    #|  AND COALESCE(pnj.form, '')           = COALESCE(pn.form, '')
+    #|  AND COALESCE(pnj.region, '')         = COALESCE(pn.region, '')
+    #|  AND COALESCE(pnj.mega_evolution, '') = COALESCE(pn.mega_evolution, '')
+    #|  AND pnj.language = 'jpn'
     #|JOIN pokedex_name pne ON pn.id = pne.id
     #|  AND COALESCE(pne.form, '')           = COALESCE(pn.form, '')
     #|  AND COALESCE(pne.region, '')         = COALESCE(pn.region, '')
@@ -51,9 +62,15 @@ pub fn query_pokemon(
   let r = rows[0]
   let id = r[0]
   let global_no = r[1]
-  // 原種 (base id) を引いた時だけ forms[] を埋める (discoverability)。
-  // 該当 version に実在するフォームだけに絞るため local_pokedex_status を JOIN。
-  let forms : Array[String] = if is_base_id(id) {
+  // forms[] は「原種 (base) 行を直接引いた時」だけ埋める (discoverability)。
+  // id 末尾だけで判定すると 012 の M 性別 alias (M base id を共有) も base 扱い
+  // になってしまうため、マッチした pn 行の form/region/mega/gmax が全て空である
+  // ことで base 行を判定する。
+  let is_base_row = r[17].length() == 0 &&
+    r[18].length() == 0 &&
+    r[19].length() == 0 &&
+    r[20].length() == 0
+  let forms : Array[String] = if is_base_row {
     query_forms(db, global_no, id, version)
   } else {
     []
@@ -77,22 +94,6 @@ pub fn query_pokemon(
     weight: parse_double(r[16]),
     forms,
   })
-}
-
-///|
-/// base id (globalNo_00000000_0_000_0) かどうか。
-fn is_base_id(id : String) -> Bool {
-  let suffix = "_00000000_0_000_0"
-  if id.length() < suffix.length() {
-    return false
-  }
-  let start = id.length() - suffix.length()
-  for i = 0; i < suffix.length(); i = i + 1 {
-    if id[start + i] != suffix[i] {
-      return false
-    }
-  }
-  true
 }
 
 ///|
